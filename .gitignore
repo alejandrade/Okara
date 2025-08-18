@@ -152,6 +152,7 @@ claude_history.txt
 claude-*.json
 anthropic-*.json
 
-.env
+**/.env
 
 application.yml
+/frontend/.env
