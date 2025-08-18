@@ -1,0 +1,157 @@
+### IntelliJ IDEA ###
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store
+
+### Gradle ###
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### React Frontend ###
+frontend/node_modules/
+frontend/build/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+### Java ###
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+hs_err_pid*
+
+### Logs ###
+*.log
+logs/
+
+### Firebase & Secrets ###
+**/firebase-adminsdk-*.json
+**/service-account-*.json
+**/.env
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+
+### Database ###
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+### MongoDB ###
+mongo-data/
+mongodb-data/
+**/mongo-data/
+**/mongodb-data/
+db/
+database/
+
+### Generated Frontend Build in Backend ###
+src/main/resources/static/
+src/main/resources/templates/index.html
+
+### Temporary Files ###
+*.tmp
+*.temp
+*~
+
+### IDE Specific ###
+.idea/
+*.iml
+*.ipr
+*.iws
+
+### Package Managers ###
+package-lock.json
+yarn.lock
+node_modules/
+
+### OS Generated ###
+Thumbs.db
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+### Runtime ###
+*.pid
+*.seed
+*.pid.lock
+
+### Coverage Reports ###
+coverage/
+*.lcov
+.nyc_output/
+
+### Dependency Directories ###
+jspm_packages/
+
+### Optional npm cache directory ###
+.npm
+
+### Optional REPL history ###
+.node_repl_history
+
+### Docker ###
+.dockerignore
+
+### Claude Code ###
+.claude/
+claude.md
+CLAUDE.md
+.claude_history
+claude_history.txt
+.claude-code/
+**/claude-sessions/
+**/claude-logs/
+
+### AI Assistant Files ###
+.anthropic/
+.openai/
+.ai-context/
+**/ai-generated/
+claude-*.json
+anthropic-*.json
+
+.env
+
+application.yml
