@@ -1,19 +1,18 @@
 package io.shrouded.okara.repository;
 
+import com.google.cloud.spring.data.firestore.FirestoreReactiveRepository;
 import io.shrouded.okara.model.User;
-import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
-
-import java.util.Optional;
+import reactor.core.publisher.Mono;
 
 @Repository
-public interface UserRepository extends MongoRepository<User, String> {
-    
-    Optional<User> findByUsername(String username);
-    
-    Optional<User> findByEmail(String email);
-    
-    boolean existsByUsername(String username);
-    
-    boolean existsByEmail(String email);
+public interface UserRepository extends FirestoreReactiveRepository<User> {
+
+    Mono<User> findByUsername(String username);
+
+    Mono<User> findByEmail(String email);
+
+    Mono<Boolean> existsByUsername(String username);
+
+    Mono<Boolean> existsByEmail(String email);
 }

@@ -1,0 +1,27 @@
+indexes:
+  # For user feeds: query by authorId and order by createdAt desc
+  - kind: feeds
+    properties:
+      - name: authorId
+      - name: createdAt
+        direction: desc
+
+  # For global feeds: query by type and order by createdAt desc
+  - kind: feeds
+    properties:
+      - name: type
+      - name: createdAt
+        direction: desc
+
+  # If you query user_feeds by userId + feedType
+  - kind: user_feeds
+    properties:
+      - name: userId
+      - name: feedType
+
+  # If you also include shardId in the same query
+  - kind: user_feeds
+    properties:
+      - name: userId
+      - name: feedType
+      - name: shardId

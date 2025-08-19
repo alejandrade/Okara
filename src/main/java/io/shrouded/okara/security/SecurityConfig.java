@@ -3,65 +3,58 @@ package io.shrouded.okara.security;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.cors.reactive.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
 @Configuration
-@EnableWebSecurity
+@EnableWebFluxSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
     
-    private final FirebaseAuthenticationFilter firebaseAuthenticationFilter;
-    private final CustomAuthenticationEntryPoint authenticationEntryPoint;
+    private final FirebaseReactiveAuthenticationWebFilter firebaseReactiveAuthenticationWebFilter;
     
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf(AbstractHttpConfigurer::disable)
+    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
+        return http
+            .csrf(ServerHttpSecurity.CsrfSpec::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .exceptionHandling(exceptions -> exceptions
-                .authenticationEntryPoint(authenticationEntryPoint))
-            .authorizeHttpRequests(authz -> authz
+            .authorizeExchange(exchanges -> exchanges
                 // Public endpoints
-                .requestMatchers("/actuator/**").permitAll()
-                .requestMatchers("/api/info").permitAll()
-                .requestMatchers("/api/feed/main").permitAll()
-                .requestMatchers("/api/feed/{postId}").permitAll()
-                .requestMatchers("/api/feed/{postId}/comments").permitAll()
-                .requestMatchers("/api/feed/user/{userId}").permitAll()
-                .requestMatchers("/api/auth/users/{username}").permitAll()
+                .pathMatchers("/actuator/**").permitAll()
+                .pathMatchers("/api/info").permitAll()
+                .pathMatchers("/api/feed/main").permitAll()
+                .pathMatchers("/api/feed/{postId}").permitAll()
+                .pathMatchers("/api/feed/{postId}/comments").permitAll()
+                .pathMatchers("/api/feed/user/{userId}").permitAll()
+                .pathMatchers("/api/auth/users/{username}").permitAll()
                 
                 // Protected endpoints - require authentication
-                .requestMatchers("/api/auth/login").authenticated()
-                .requestMatchers("/api/auth/me").authenticated()
-                .requestMatchers("/api/auth/follow/**").authenticated()
-                .requestMatchers("/api/auth/unfollow/**").authenticated()
-                .requestMatchers("/api/auth/profile").authenticated()
-                .requestMatchers("/api/feed/post").authenticated()
-                .requestMatchers("/api/feed/*/comment").authenticated()
-                .requestMatchers("/api/feed/*/like").authenticated()
-                .requestMatchers("/api/feed/*/dislike").authenticated()
-                .requestMatchers("/api/feed/*/retweet").authenticated()
-                .requestMatchers("/api/feed/*/quote").authenticated()
-                .requestMatchers("/api/feed/timeline").authenticated()
-                .requestMatchers("/api/feed/*/delete").authenticated()
+                .pathMatchers("/api/auth/login").authenticated()
+                .pathMatchers("/api/auth/me").authenticated()
+                .pathMatchers("/api/auth/follow/**").authenticated()
+                .pathMatchers("/api/auth/unfollow/**").authenticated()
+                .pathMatchers("/api/auth/profile").authenticated()
+                .pathMatchers("/api/feed/post").authenticated()
+                .pathMatchers("/api/feed/*/comment").authenticated()
+                .pathMatchers("/api/feed/*/like").authenticated()
+                .pathMatchers("/api/feed/*/dislike").authenticated()
+                .pathMatchers("/api/feed/*/retweet").authenticated()
+                .pathMatchers("/api/feed/*/quote").authenticated()
+                .pathMatchers("/api/feed/timeline").authenticated()
+                .pathMatchers("/api/feed/*/delete").authenticated()
                 
                 // All other requests require authentication
-                .anyRequest().authenticated()
+                .anyExchange().authenticated()
             )
-            .addFilterBefore(firebaseAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-        
-        return http.build();
+            .addFilterBefore(firebaseReactiveAuthenticationWebFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+            .build();
     }
     
     @Bean

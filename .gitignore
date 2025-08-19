@@ -156,3 +156,4 @@ anthropic-*.json
 
 application.yml
 /frontend/.env
+/frontend/.env

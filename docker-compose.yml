@@ -1,21 +1,6 @@
 version: '3.8'
 
 services:
-  mongodb:
-    image: mongo:7.0
-    container_name: okara-mongodb
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
-      MONGO_INITDB_DATABASE: okara
-    volumes:
-      - mongodb_data:/data/db
-      - ./docker/mongo-init:/docker-entrypoint-initdb.d
-    networks:
-      - okara-network
 
   redis:
     image: redis:7.2-alpine
