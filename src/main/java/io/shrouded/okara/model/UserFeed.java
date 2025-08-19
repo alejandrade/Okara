@@ -21,11 +21,11 @@ public class UserFeed {
     private String id;
     private String userId;
     private UserFeedType feedType;
-    private LinkedList<FeedItem> items = new LinkedList<>();
+    private LinkedList<FeedItem> items;
     private Timestamp lastUpdated;
     private String nextCursor;
     private String prevCursor;
-    private Integer totalItems = 0;
+    private Integer totalItems;
     private Timestamp createdAt;
 
     public UserFeed(String userId, UserFeedType feedType) {
@@ -38,7 +38,7 @@ public class UserFeed {
         this.totalItems = 0;
     }
 
-    public static String generateId(String userId, UserFeedType feedType) {
+    private String generateId(String userId, UserFeedType feedType) {
         return String.format("%s_%s", userId, feedType.name().toLowerCase());
     }
 

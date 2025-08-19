@@ -18,19 +18,19 @@ public class FeedItem {
     private String authorProfileImageUrl;
 
     private String content;
-    private List<String> imageUrls = new ArrayList<>();
+    private List<String> imageUrls;
     private String videoUrl;
 
     private FeedType postType;
     private Timestamp createdAt;
     private Timestamp addedToFeedAt;
 
-    private Integer likesCount = 0;
-    private Integer retweetsCount = 0;
-    private Integer commentsCount = 0;
+    private Integer likesCount;
+    private Integer retweetsCount ;
+    private Integer commentsCount;
 
-    private Double algorithmScore = 0.0;
-    private List<String> relevanceTags = new ArrayList<>();
+    private Double algorithmScore;
+    private List<String> relevanceTags;
     private String reasonShown;
 
     private String originalPostId;
@@ -46,7 +46,7 @@ public class FeedItem {
         this.content = post.getContent();
         this.imageUrls = post.getImageUrls() != null ? post.getImageUrls() : new ArrayList<>();
         this.videoUrl = post.getVideoUrl();
-
+        this.relevanceTags = new ArrayList<>();
         this.postType = post.getType();
         this.createdAt = post.getCreatedAt();
         this.addedToFeedAt = Timestamp.now();

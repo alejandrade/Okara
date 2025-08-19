@@ -35,7 +35,7 @@ public class ViewEvent {
         this.viewedAt = Timestamp.now();
     }
 
-    public static String generateId(String userId, String postId) {
+    private String generateId(String userId, String postId) {
         return String.format("%s_%s_%d", userId, postId, System.currentTimeMillis());
     }
 }

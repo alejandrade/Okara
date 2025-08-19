@@ -24,10 +24,10 @@ public class Feed {
     private String authorProfileImageUrl;
 
     private String content;
-    private List<String> imageUrls = new ArrayList<>();
+    private List<String> imageUrls;
     private String videoUrl;
 
-    private FeedType type = FeedType.POST;
+    private FeedType type;
 
     private String parentId;
     private String rootId;
@@ -35,26 +35,26 @@ public class Feed {
     private Timestamp createdAt;
     private Timestamp updatedAt;
 
-    private List<String> likedBy = new ArrayList<>();
-    private List<String> dislikedBy = new ArrayList<>();
-    private List<String> retweetedBy = new ArrayList<>();
+    private List<String> likedBy;
+    private List<String> dislikedBy;
+    private List<String> retweetedBy;
 
-    private Integer likesCount = 0;
-    private Integer dislikesCount = 0;
-    private Integer retweetsCount = 0;
-    private Integer commentsCount = 0;
-    private Integer viewsCount = 0;
+    private Integer likesCount;
+    private Integer dislikesCount;
+    private Integer retweetsCount;
+    private Integer commentsCount;
+    private Integer viewsCount;
 
-    private Double baseEngagementScore = 0.0;
-    private Integer distinctCommentersCount = 0;
-    private List<String> niches = new ArrayList<>();
+    private Double baseEngagementScore;
+    private Integer distinctCommentersCount;
+    private List<String> niches;
 
     private String originalPostId;
     private String quoteTweetComment;
 
-    private boolean isPinned = false;
-    private List<String> hashtags = new ArrayList<>();
-    private List<String> mentions = new ArrayList<>();
+    private boolean isPinned;
+    private List<String> hashtags;
+    private List<String> mentions;
 
 
     public Feed(String authorId, String authorUsername, String content, FeedType type) {

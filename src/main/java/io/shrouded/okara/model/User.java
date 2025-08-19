@@ -29,29 +29,16 @@ public class User {
     private Timestamp createdAt;
     private Timestamp updatedAt;
 
-    private List<String> following = new ArrayList<>();
-    private List<String> followers = new ArrayList<>();
+    private List<String> following;
+    private List<String> followers;
 
-    private Integer followingCount = 0;
-    private Integer followersCount = 0;
-    private Integer postsCount = 0;
-    private Integer totalViewsCount = 0;
+    private Integer followingCount;
+    private Integer followersCount;
+    private Integer postsCount;
+    private Integer totalViewsCount;
 
-    private boolean verified = false;
-    private boolean isPrivate = false;
-
-    {
-        this.following = new ArrayList<>();
-        this.followers = new ArrayList<>();
-        this.followingCount = 0;
-        this.followersCount = 0;
-        this.postsCount = 0;
-        this.totalViewsCount = 0;
-        this.verified = false;
-        this.isPrivate = false;
-        this.createdAt = Timestamp.now();
-        this.updatedAt = Timestamp.now();
-    }
+    private boolean verified;
+    private boolean isPrivate;
 
     public User(String username, String email, String displayName) {
         this.username = username;

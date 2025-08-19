@@ -125,7 +125,6 @@ public class FeedController {
                                                                .map(feedItems -> {
                                                                    List<FeedDto> feedDtos = feedItems.stream()
                                                                                                      .map(feedMapper::convertToFeed)
-                                                                                                     .filter(Objects::nonNull)
                                                                                                      .map(feedMapper::toFeedDto)
                                                                                                      .toList();
                                                                    log.info("🎯 Converted to {} DTOs", feedDtos.size());

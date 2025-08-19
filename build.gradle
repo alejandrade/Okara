@@ -38,6 +38,8 @@ dependencies {
     implementation("com.google.cloud:spring-cloud-gcp-starter-data-firestore:7.1.0")
     // Google Cloud Pub/Sub
     implementation 'com.google.cloud:spring-cloud-gcp-starter-pubsub:7.1.0'
+    // Google Cloud Storage
+    implementation 'com.google.cloud:google-cloud-storage'
     
     // Spring Integration (required for Pub/Sub messaging)
     implementation 'org.springframework.boot:spring-boot-starter-integration'
