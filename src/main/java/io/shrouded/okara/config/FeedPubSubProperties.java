@@ -8,12 +8,12 @@ import org.springframework.stereotype.Component;
 @Component
 @ConfigurationProperties(prefix = "feed.pubsub")
 public class FeedPubSubProperties {
-    
+
     /**
      * The Pub/Sub topic name for feed events
      */
     private String topic = "feed-events";
-    
+
     /**
      * The Pub/Sub subscription name for feed fanout processing
      */

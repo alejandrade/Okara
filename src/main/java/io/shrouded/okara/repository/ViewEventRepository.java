@@ -1,6 +1,7 @@
 package io.shrouded.okara.repository;
 
 import com.google.cloud.spring.data.firestore.FirestoreReactiveRepository;
+import io.shrouded.okara.enums.ViewSource;
 import io.shrouded.okara.model.ViewEvent;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
@@ -25,7 +26,7 @@ public interface ViewEventRepository extends FirestoreReactiveRepository<ViewEve
     Mono<Long> countByPostId(String postId);
 
     // Find views by view source (for analytics)
-    Flux<ViewEvent> findByViewSource(ViewEvent.ViewSource viewSource);
+    Flux<ViewEvent> findByViewSource(ViewSource viewSource);
 
     // Find recent views by user (for recent activity)
     Flux<ViewEvent> findByUserIdOrderByViewedAtDesc(String userId);
