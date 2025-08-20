@@ -20,8 +20,8 @@ public class UserService {
     private final FeedEventPublisher feedEventPublisher;
     private final PersonalFeedService personalFeedService;
 
-    public Mono<User> getOrCreateUser(String userId) {
-        return Mono.fromCallable(() -> firebaseAuthService.verifyToken(userId))
+    public Mono<User> getOrCreateUser(String jwtToken, String fcmToken) {
+        return Mono.fromCallable(() -> firebaseAuthService.verifyToken(jwtToken))
                    .flatMap(decodedToken -> {
                        String firebaseUid = decodedToken.getUid();
                        String email = decodedToken.getEmail();
@@ -30,6 +30,16 @@ public class UserService {
 
                        // Check if user exists by email
                        return userRepository.findByEmail(email)
+                                            .flatMap(existingUser -> {
+                                                // Update FCM token for existing user
+                                                if (fcmToken != null && fcmToken.equals(existingUser.getFcmToken())) {
+                                                    return Mono.just(existingUser) ;
+                                                }
+
+                                                existingUser.setFcmToken(fcmToken);
+                                                existingUser.setUpdatedAt(Timestamp.now());
+                                                return userRepository.save(existingUser);
+                                            })
                                             .switchIfEmpty(Mono.defer(() -> {
                                                 // Create new user
                                                 String username = generateUniqueUsername(email, name);
@@ -37,6 +47,7 @@ public class UserService {
                                                                         email,
                                                                         name != null ? name : username);
                                                 newUser.setProfileImageUrl(picture);
+                                                newUser.setFcmToken(fcmToken);
                                                 newUser.setCreatedAt(Timestamp.now());
                                                 newUser.setUpdatedAt(Timestamp.now());
 

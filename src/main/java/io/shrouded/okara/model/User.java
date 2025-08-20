@@ -25,6 +25,7 @@ public class User {
     private String bannerImageUrl;
     private String location;
     private String website;
+    private String fcmToken;
 
     private Timestamp createdAt;
     private Timestamp updatedAt;

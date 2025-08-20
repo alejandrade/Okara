@@ -1,5 +1,6 @@
 package io.shrouded.okara.controller;
 
+import io.shrouded.okara.dto.user.LoginRequest;
 import io.shrouded.okara.dto.user.UserDto;
 import io.shrouded.okara.exception.OkaraException;
 import io.shrouded.okara.mapper.UserMapper;
@@ -34,10 +35,11 @@ public class AuthController {
     private final UserMapper userMapper;
 
     @PostMapping("/login")
-    public Mono<ResponseEntity<UserDto>> loginOrRegister(@RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader) {
+    public Mono<ResponseEntity<UserDto>> loginOrRegister(@RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader,
+                                                        @RequestBody LoginRequest loginRequest) {
         log.info("🔐 LOGIN/REGISTER ENDPOINT HIT!");
         String token = authHeader.substring(7);
-        return userService.getOrCreateUser(token)
+        return userService.getOrCreateUser(token, loginRequest.fcmToken())
                           .doOnSuccess(user -> log.info(
                                   "🔐 Successfully logged in/registered user: {}",
                                   user.getEmail()))

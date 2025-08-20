@@ -1,4 +1,4 @@
 package io.shrouded.okara.dto.user;
 
-public record LoginRequest(String userId) {
+public record LoginRequest(String fcmToken) {
 }
