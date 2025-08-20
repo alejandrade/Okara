@@ -20,8 +20,8 @@ public class UserService {
     private final FeedEventPublisher feedEventPublisher;
     private final PersonalFeedService personalFeedService;
 
-    public Mono<User> getOrCreateUser(String idToken) {
-        return Mono.fromCallable(() -> firebaseAuthService.verifyToken(idToken))
+    public Mono<User> getOrCreateUser(String userId) {
+        return Mono.fromCallable(() -> firebaseAuthService.verifyToken(userId))
                    .flatMap(decodedToken -> {
                        String firebaseUid = decodedToken.getUid();
                        String email = decodedToken.getEmail();

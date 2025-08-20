@@ -63,10 +63,10 @@ public class FirebaseReactiveAuthenticationWebFilter implements WebFilter {
                                return authToken;
 
                            } catch (FirebaseAuthException e) {
-                               log.error("🔥 Invalid Firebase token: {}", e.getMessage());
+                               log.error("🔥 Invalid Firebase token", e);
                                return null;
                            } catch (Exception e) {
-                               log.error("🔥 Unexpected error in Firebase filter: {}", e.getMessage());
+                               log.error("🔥 Unexpected error in Firebase filter", e);
                                return null;
                            }
                        })

@@ -29,13 +29,11 @@ public class SecurityConfig {
                         // Public endpoints
                         .pathMatchers("/actuator/**").permitAll()
                         .pathMatchers("/api/info").permitAll()
-                        .pathMatchers("/api/feed/main").permitAll()
-                        .pathMatchers("/api/feed/{postId}").permitAll()
-                        .pathMatchers("/api/feed/{postId}/comments").permitAll()
-                        .pathMatchers("/api/feed/user/{userId}").permitAll()
-                        .pathMatchers("/api/auth/users/{username}").permitAll()
-
-                        // Protected endpoints - require authentication
+                        .pathMatchers("/api/feed/{postId}").authenticated()
+                        .pathMatchers("/api/feed/{postId}/comments").authenticated()
+                        .pathMatchers("/api/feed/user/{userId}").authenticated()
+                        .pathMatchers("/api/auth/users/{username}").authenticated()
+                        .pathMatchers("/api/feed/main").authenticated()
                         .pathMatchers("/api/auth/login").authenticated()
                         .pathMatchers("/api/auth/me").authenticated()
                         .pathMatchers("/api/auth/follow/**").authenticated()

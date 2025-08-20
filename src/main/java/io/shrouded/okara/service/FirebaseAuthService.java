@@ -12,7 +12,8 @@ public class FirebaseAuthService {
 
     public FirebaseToken verifyToken(String idToken) throws FirebaseAuthException {
         try {
-            return FirebaseAuth.getInstance().verifyIdToken(idToken);
+            FirebaseAuth instance = FirebaseAuth.getInstance();
+            return instance.verifyIdToken(idToken);
         } catch (FirebaseAuthException e) {
             log.error("Failed to verify Firebase token: {}", e.getMessage());
             throw e;
