@@ -8,14 +8,12 @@ import java.util.Collection;
 public class FirebaseAuthenticationToken extends AbstractAuthenticationToken {
 
     private final String firebaseUid;
-    private final String email;
     private final String name;
 
-    public FirebaseAuthenticationToken(String firebaseUid, String email, String name,
+    public FirebaseAuthenticationToken(String firebaseUid, String name,
                                        Collection<? extends GrantedAuthority> authorities) {
         super(authorities);
         this.firebaseUid = firebaseUid;
-        this.email = email;
         this.name = name;
         setAuthenticated(true);
     }
@@ -32,10 +30,6 @@ public class FirebaseAuthenticationToken extends AbstractAuthenticationToken {
 
     public String getFirebaseUid() {
         return firebaseUid;
-    }
-
-    public String getEmail() {
-        return email;
     }
 
     public String getName() {

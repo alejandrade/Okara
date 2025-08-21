@@ -108,7 +108,7 @@ public class FeedController {
     }
 
     @GetMapping("/main")
-    public Mono<ResponseEntity<List<FeedDto>>> getMainFeed(
+    public Mono<List<FeedDto>> getMainFeed(
             @RequestParam(defaultValue = "20") int limit,
             @RequestParam(required = false) String sinceId) {
         log.info("🎯 Main feed request - limit: {}, sinceId: {}", limit, sinceId);
@@ -128,7 +128,7 @@ public class FeedController {
                                                                                                      .map(feedMapper::toFeedDto)
                                                                                                      .toList();
                                                                    log.info("🎯 Converted to {} DTOs", feedDtos.size());
-                                                                   return ResponseEntity.ok(feedDtos);
+                                                                   return feedDtos;
                                                                });
                                  })
                                  .doOnError(e -> log.error("🎯 Error in main feed chain: {}", e.getMessage(), e))

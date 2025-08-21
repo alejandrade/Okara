@@ -1,6 +1,9 @@
 package io.shrouded.okara.service;
 
 import com.google.cloud.Timestamp;
+import com.google.cloud.firestore.DocumentReference;
+import com.google.cloud.firestore.Firestore;
+import com.google.cloud.spring.data.firestore.FirestoreReactiveOperations;
 import com.google.firebase.auth.FirebaseAuthException;
 import io.shrouded.okara.model.User;
 import io.shrouded.okara.repository.UserRepository;
@@ -24,12 +27,10 @@ public class UserService {
         return Mono.fromCallable(() -> firebaseAuthService.verifyToken(jwtToken))
                    .flatMap(decodedToken -> {
                        String firebaseUid = decodedToken.getUid();
-                       String email = decodedToken.getEmail();
-                       String name = decodedToken.getName();
                        String picture = (String) decodedToken.getClaims().get("picture");
 
                        // Check if user exists by email
-                       return userRepository.findByEmail(email)
+                       return userRepository.findByFirebaseUid(firebaseUid)
                                             .flatMap(existingUser -> {
                                                 // Update FCM token for existing user
                                                 if (fcmToken != null && fcmToken.equals(existingUser.getFcmToken())) {
@@ -42,10 +43,10 @@ public class UserService {
                                             })
                                             .switchIfEmpty(Mono.defer(() -> {
                                                 // Create new user
-                                                String username = generateUniqueUsername(email, name);
-                                                User newUser = new User(username,
-                                                                        email,
-                                                                        name != null ? name : username);
+
+                                                User newUser = new User();
+                                                newUser.setFirebaseUid(firebaseUid);
+                                                newUser.setUsername("anon");
                                                 newUser.setProfileImageUrl(picture);
                                                 newUser.setFcmToken(fcmToken);
                                                 newUser.setCreatedAt(Timestamp.now());
@@ -55,9 +56,8 @@ public class UserService {
                                                                      .publishOn(Schedulers.boundedElastic())
                                                                      .doOnSuccess(savedUser -> {
                                                                          log.info(
-                                                                                 "New user created: {} with username: {}",
-                                                                                 email,
-                                                                                 username);
+                                                                                 "New user created: {} with firebaseUid: {}",
+                                                                                 firebaseUid);
 
                                                                          // Initialize personal feed for new user
                                                                          personalFeedService.initializeUserFeed(
@@ -79,20 +79,16 @@ public class UserService {
                    });
     }
 
-    public Mono<User> findById(String id) {
-        return userRepository.findById(id);
-    }
-
     public Mono<User> findByUsername(String username) {
         return userRepository.findByUsername(username);
     }
 
-    public Mono<User> findByEmail(String email) {
-        return userRepository.findByEmail(email);
+    public Mono<User> findByFirebaseUid(String firebaseUid) {
+        return userRepository.findByFirebaseUid(firebaseUid);
     }
 
-    public Mono<User> saveUser(User user) {
-        return userRepository.save(user);
+    public Mono<User> saveUser(User newUser) {
+        return userRepository.save(newUser);
     }
 
     public Mono<User> followUser(String followerId, String followeeId) {
@@ -197,26 +193,5 @@ public class UserService {
                              });
     }
 
-    private String generateUniqueUsername(String email, String name) {
-        String baseUsername;
 
-        if (name != null && !name.trim().isEmpty()) {
-            baseUsername = name.toLowerCase()
-                               .replaceAll("[^a-z0-9]", "")
-                               .substring(0, Math.min(name.length(), 15));
-        } else {
-            baseUsername = email.split("@")[0]
-                    .toLowerCase()
-                    .replaceAll("[^a-z0-9]", "");
-        }
-
-        if (baseUsername.length() < 3) {
-            baseUsername = "user" + baseUsername;
-        }
-
-        // For now, we'll use a simple approach without checking uniqueness
-        // In a production system, you'd want to implement this reactively
-        // or use a different strategy like UUID-based usernames
-        return baseUsername;
-    }
 }

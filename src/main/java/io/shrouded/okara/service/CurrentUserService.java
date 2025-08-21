@@ -56,56 +56,47 @@ public class CurrentUserService {
 
         if (authentication instanceof FirebaseAuthenticationToken firebaseAuth) {
             final String firebaseUid = firebaseAuth.getPrincipal().toString();
-            final String email = firebaseAuth.getEmail();
-            log.info("Firebase auth token - UID: {}, Email: {}, Name: {}", firebaseUid, email, firebaseAuth.getName());
-
-            if (email == null || email.isBlank()) {
-                log.error("Firebase token missing email - UID: {}", firebaseUid);
-                return Mono.error(new RuntimeException("Authenticated user has no email"));
-            }
+            log.info("Firebase auth token - UID: {}, Name: {}", firebaseUid, firebaseAuth.getName());
 
             if (firebaseUid == null || firebaseUid.isBlank()) {
-                log.error("Firebase token missing UID - Email: {}", email);
+                log.error("Firebase token missing UID");
                 return Mono.error(new RuntimeException("Authenticated user has no UID"));
             }
 
             log.info("Looking up user by Firebase UID: {}", firebaseUid);
 
             // First try to find user by Firebase UID
-            return userService.findById(firebaseUid)
+            return userService.findByFirebaseUid(firebaseUid)
                               .doOnSuccess(user -> {
                                   if (user != null) {
-                                      log.info("Found existing user by UID: {} with email: {}",
-                                               firebaseUid,
-                                               user.getEmail());
+                                      log.info("Found existing user by UID: {} ",
+                                               firebaseUid);
                                   } else {
                                       log.warn("User lookup by UID returned null for UID: {}", firebaseUid);
                                   }
                               })
                               .switchIfEmpty(Mono.defer(() -> {
-                                  log.info("User not found by UID: {}, trying email lookup: {}", firebaseUid, email);
+                                  log.info("User not found by UID: {}", firebaseUid);
                                   // If not found by UID, try by email (for backward compatibility)
-                                  return userService.findByEmail(email)
+                                  return userService.findByFirebaseUid(firebaseUid)
                                                     .doOnSuccess(user -> {
                                                         if (user != null) {
-                                                            log.info("Found existing user by email: {} with ID: {}",
-                                                                     email,
+                                                            log.info("Found existing user by firebaseUid: {} with ID: {}",
+                                                                     firebaseUid,
                                                                      user.getId());
                                                         } else {
-                                                            log.warn("User lookup by email returned null for email: {}",
-                                                                     email);
+                                                            log.warn("User lookup by email returned null for firebaseUid: {}",
+                                                                     firebaseUid);
                                                         }
                                                     })
                                                     .switchIfEmpty(Mono.defer(() -> {
                                                         log.info(
-                                                                "Creating new user from Firebase auth - UID: {}, Email: {}",
-                                                                firebaseUid,
-                                                                email);
+                                                                "Creating new user from Firebase auth - UID: {}",
+                                                                firebaseUid);
                                                         User newUser = new User();
                                                         newUser.setId(firebaseUid); // Set the Firebase UID as the user ID
-                                                        newUser.setEmail(email);
                                                         newUser.setDisplayName(firebaseAuth.getName());
-                                                        newUser.setUsername(generateUsernameFromEmail(email));
+                                                        newUser.setUsername("anon");
                                                         newUser.setCreatedAt(Timestamp.now());
                                                         newUser.setUpdatedAt(Timestamp.now());
 
@@ -149,14 +140,4 @@ public class CurrentUserService {
         return Mono.error(new RuntimeException("User not authenticated"));
     }
 
-    private String generateUsernameFromEmail(String email) {
-        String baseUsername = email.split("@")[0]
-                .toLowerCase()
-                .replaceAll("[^a-z0-9]", "");
-
-        if (baseUsername.length() < 3) {
-            baseUsername = "user" + baseUsername;
-        }
-        return baseUsername;
-    }
 }

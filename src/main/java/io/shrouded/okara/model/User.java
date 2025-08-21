@@ -6,7 +6,6 @@ import com.google.cloud.spring.data.firestore.Document;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Data
@@ -16,6 +15,7 @@ public class User {
 
     @DocumentId
     private String id;
+    private String firebaseUid;
 
     private String username;
     private String email;
@@ -40,20 +40,4 @@ public class User {
 
     private boolean verified;
     private boolean isPrivate;
-
-    public User(String username, String email, String displayName) {
-        this.username = username;
-        this.email = email;
-        this.displayName = displayName;
-        this.createdAt = Timestamp.now();
-        this.updatedAt = Timestamp.now();
-        this.following = new ArrayList<>();
-        this.followers = new ArrayList<>();
-        this.followingCount = 0;
-        this.followersCount = 0;
-        this.postsCount = 0;
-        this.totalViewsCount = 0;
-        this.verified = false;
-        this.isPrivate = false;
-    }
 }

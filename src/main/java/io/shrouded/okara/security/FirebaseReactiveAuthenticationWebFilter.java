@@ -47,20 +47,15 @@ public class FirebaseReactiveAuthenticationWebFilter implements WebFilter {
 
                                log.info("🔥 Token verified successfully - UID: {}, Email: {}, Name: {}", firebaseUid, email, name);
 
-                               if (firebaseUid == null || firebaseUid.isBlank() || email == null || email.isBlank()) {
-                                   log.error("🔥 Firebase UID or email is null/blank - cannot authenticate");
+                               if (firebaseUid == null || firebaseUid.isBlank()) {
+                                   log.error("🔥 Firebase UID is null/blank - cannot authenticate");
                                    return null;
                                }
 
                                List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_USER"));
 
-                               FirebaseAuthenticationToken authToken = new FirebaseAuthenticationToken(
-                                       firebaseUid, email, name, authorities);
-
-                               log.info("🔥 Created FirebaseAuthenticationToken - Principal: {}, Email: {}",
-                                        authToken.getPrincipal(), authToken.getEmail());
-
-                               return authToken;
+                               return new FirebaseAuthenticationToken(
+                                       firebaseUid, name, authorities);
 
                            } catch (FirebaseAuthException e) {
                                log.error("🔥 Invalid Firebase token", e);

@@ -10,7 +10,7 @@ public interface UserRepository extends FirestoreReactiveRepository<User> {
 
     Mono<User> findByUsername(String username);
 
-    Mono<User> findByEmail(String email);
+    Mono<User> findByFirebaseUid(String firebaseUid);
 
     Mono<Boolean> existsByUsername(String username);
 
