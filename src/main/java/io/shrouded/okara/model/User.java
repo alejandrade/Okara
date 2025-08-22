@@ -1,25 +1,19 @@
 package io.shrouded.okara.model;
 
 import com.google.cloud.Timestamp;
-import com.google.cloud.firestore.annotation.DocumentId;
-import com.google.cloud.spring.data.firestore.Document;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.ArrayList;
 
 @Data
 @NoArgsConstructor
-@Document(collectionName = "users")
 public class User {
 
-    @DocumentId
     private String id;
-    private String firebaseUid;
-
-    private String username;
     private String email;
-    private String displayName;
+    private String displayName = "Anon";
     private String bio;
     private String profileImageUrl;
     private String bannerImageUrl;
@@ -40,4 +34,7 @@ public class User {
 
     private boolean verified;
     private boolean isPrivate;
+
+    private List<UserChatroom> chatrooms = new ArrayList<>();
+
 }

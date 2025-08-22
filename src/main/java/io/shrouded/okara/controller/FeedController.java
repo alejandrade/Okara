@@ -2,6 +2,7 @@ package io.shrouded.okara.controller;
 
 import io.shrouded.okara.dto.feed.CreateCommentRequest;
 import io.shrouded.okara.dto.feed.CreatePostRequest;
+import io.shrouded.okara.dto.feed.CrossPostRequest;
 import io.shrouded.okara.dto.feed.FeedDto;
 import io.shrouded.okara.dto.feed.QuoteRetweetRequest;
 import io.shrouded.okara.exception.OkaraException;
@@ -9,9 +10,9 @@ import io.shrouded.okara.mapper.FeedMapper;
 import io.shrouded.okara.service.CurrentUserService;
 import io.shrouded.okara.service.FeedService;
 import io.shrouded.okara.service.PersonalFeedService;
+import io.shrouded.okara.service.ChatroomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,11 +21,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
 import reactor.core.publisher.Mono;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/feed")
@@ -36,21 +37,40 @@ public class FeedController {
     private final CurrentUserService currentUserService;
     private final PersonalFeedService personalFeedService;
     private final FeedMapper feedMapper;
+    private final ChatroomService chatroomService;
 
     @PostMapping("/post")
-    public Mono<ResponseEntity<FeedDto>> createPost(@RequestBody CreatePostRequest request) {
+    public Mono<FeedDto> createPost(@Valid @RequestBody CreatePostRequest request) {
         return currentUserService.getCurrentUser()
-                                 .flatMap(currentUser ->
-                                                  feedService.createPost(currentUser.getId(),
-                                                                         request.content(),
-                                                                         request.imageUrls(),
-                                                                         request.videoUrl())
-                                                             .map(post -> ResponseEntity.ok(feedMapper.toFeedDto(post)))
-                                 );
+                                 .flatMap(currentUser -> {
+                                     // Validate that all chatrooms exist
+                                     return chatroomService.validateChatroomsExist(request.chatroomIds())
+                                             .then(feedService.createPost(currentUser.getId(),
+                                                                          request.content(),
+                                                                          request.imageUrls(),
+                                                                          request.videoUrl(),
+                                                                          request.chatroomIds()))
+                                             .map(feedMapper::toFeedDto);
+                                 });
+    }
+
+    @PostMapping("/{postId}/cross-post")
+    public Mono<FeedDto> crossPost(
+            @PathVariable String postId,
+            @Valid @RequestBody CrossPostRequest request) {
+        return currentUserService.getCurrentUser()
+                                 .flatMap(currentUser -> {
+                                     // Validate that all chatrooms exist
+                                     return chatroomService.validateChatroomsExist(request.chatroomIds())
+                                             .then(feedService.crossPost(currentUser.getId(),
+                                                                         postId,
+                                                                         request.chatroomIds()))
+                                             .map(feedMapper::toFeedDto);
+                                 });
     }
 
     @PostMapping("/{postId}/comment")
-    public Mono<ResponseEntity<FeedDto>> createComment(
+    public Mono<FeedDto> createComment(
             @PathVariable String postId,
             @RequestBody CreateCommentRequest request) {
         return currentUserService.getCurrentUser()
@@ -58,43 +78,39 @@ public class FeedController {
                                                   feedService.createComment(currentUser.getId(),
                                                                             postId,
                                                                             request.content())
-                                                             .map(comment -> ResponseEntity.ok(feedMapper.toFeedDto(
-                                                                     comment)))
+                                                             .map(feedMapper::toFeedDto)
                                  );
     }
 
     @PostMapping("/{postId}/like")
-    public Mono<ResponseEntity<FeedDto>> likePost(
-            @PathVariable String postId) {
+    public Mono<FeedDto> likePost(@PathVariable String postId) {
         return currentUserService.getCurrentUser()
                                  .flatMap(currentUser ->
                                                   feedService.likePost(currentUser.getId(), postId)
-                                                             .map(post -> ResponseEntity.ok(feedMapper.toFeedDto(post)))
+                                                             .map(feedMapper::toFeedDto)
                                  );
     }
 
     @PostMapping("/{postId}/dislike")
-    public Mono<ResponseEntity<FeedDto>> dislikePost(
-            @PathVariable String postId) {
+    public Mono<FeedDto> dislikePost(@PathVariable String postId) {
         return currentUserService.getCurrentUser()
                                  .flatMap(currentUser ->
                                                   feedService.dislikePost(currentUser.getId(), postId)
-                                                             .map(post -> ResponseEntity.ok(feedMapper.toFeedDto(post)))
+                                                             .map(feedMapper::toFeedDto)
                                  );
     }
 
     @PostMapping("/{postId}/retweet")
-    public Mono<ResponseEntity<FeedDto>> retweet(
-            @PathVariable String postId) {
+    public Mono<FeedDto> retweet(@PathVariable String postId) {
         return currentUserService.getCurrentUser()
                                  .flatMap(currentUser ->
                                                   feedService.retweetPost(currentUser.getId(), postId)
-                                                             .map(post -> ResponseEntity.ok(feedMapper.toFeedDto(post)))
+                                                             .map(feedMapper::toFeedDto)
                                  );
     }
 
     @PostMapping("/{postId}/quote")
-    public Mono<ResponseEntity<FeedDto>> quoteRetweet(
+    public Mono<FeedDto> quoteRetweet(
             @PathVariable String postId,
             @RequestBody QuoteRetweetRequest request) {
         return currentUserService.getCurrentUser()
@@ -102,8 +118,7 @@ public class FeedController {
                                                   feedService.quoteRetweet(currentUser.getId(),
                                                                            postId,
                                                                            request.comment())
-                                                             .map(quoteRetweet -> ResponseEntity.ok(feedMapper.toFeedDto(
-                                                                     quoteRetweet)))
+                                                             .map(feedMapper::toFeedDto)
                                  );
     }
 
@@ -136,8 +151,24 @@ public class FeedController {
                                                                signal));
     }
 
+    @GetMapping("/chatroom/{chatroomId}")
+    public Mono<List<FeedDto>> getChatroomFeed(
+            @PathVariable String chatroomId,
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam(required = false) String sinceId) {
+        log.info("🎯 Chatroom feed request - chatroomId: {}, limit: {}, sinceId: {}", chatroomId, limit, sinceId);
+
+        return feedService.getChatroomFeed(chatroomId, limit, sinceId)
+                          .doOnNext(feeds -> log.info("🎯 Found {} feeds in chatroom {}", feeds.size(), chatroomId))
+                          .map(feeds -> feeds.stream()
+                                             .map(feedMapper::toFeedDto)
+                                             .toList())
+                          .doOnError(e -> log.error("🎯 Error in chatroom feed chain: {}", e.getMessage(), e))
+                          .doFinally(signal -> log.info("🎯 Chatroom feed request completed with signal: {}", signal));
+    }
+
     @GetMapping("/user/{userId}")
-    public Mono<ResponseEntity<List<FeedDto>>> getUserFeed(
+    public Mono<List<FeedDto>> getUserFeed(
             @PathVariable String userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -150,44 +181,38 @@ public class FeedController {
                               int toIndex = Math.min(fromIndex + size, userFeed.size());
 
                               if (fromIndex >= userFeed.size()) {
-                                  return ResponseEntity.ok(Collections.emptyList());
+                                  return Collections.emptyList();
                               }
 
-                              List<FeedDto> paginatedFeed = userFeed.subList(fromIndex, toIndex)
-                                                                    .stream()
-                                                                    .map(feedMapper::toFeedDto)
-                                                                    .toList();
-                              return ResponseEntity.ok(paginatedFeed);
+                              return userFeed.subList(fromIndex, toIndex)
+                                            .stream()
+                                            .map(feedMapper::toFeedDto)
+                                            .toList();
                           });
     }
 
     @GetMapping("/{postId}")
-    public Mono<ResponseEntity<FeedDto>> getPost(@PathVariable String postId) {
+    public Mono<FeedDto> getPost(@PathVariable String postId) {
         return feedService.findById(postId)
-                          .map(post -> ResponseEntity.ok(feedMapper.toFeedDto(post)))
+                          .map(feedMapper::toFeedDto)
                           .switchIfEmpty(Mono.error(OkaraException.notFound("post")));
     }
 
     @GetMapping("/{postId}/comments")
-    public Mono<ResponseEntity<List<FeedDto>>> getComments(@PathVariable String postId) {
+    public Mono<List<FeedDto>> getComments(@PathVariable String postId) {
         return feedService.getComments(postId)
                           .collectList()
-                          .map(comments -> {
-                              List<FeedDto> commentDtos = comments.stream()
-                                                                  .map(feedMapper::toFeedDto)
-                                                                  .toList();
-                              return ResponseEntity.ok(commentDtos);
-                          });
+                          .map(comments -> comments.stream()
+                                                  .map(feedMapper::toFeedDto)
+                                                  .toList());
     }
 
     @DeleteMapping("/{postId}")
-    public Mono<ResponseEntity<FeedDto>> deletePost(
-            @PathVariable String postId) {
+    public Mono<FeedDto> deletePost(@PathVariable String postId) {
         return currentUserService.getCurrentUser()
                                  .flatMap(currentUser ->
                                                   feedService.deletePost(currentUser.getId(), postId)
-                                                             .map(deletedPost -> ResponseEntity.ok(feedMapper.toFeedDto(
-                                                                     deletedPost)))
+                                                             .map(feedMapper::toFeedDto)
                                  );
     }
 

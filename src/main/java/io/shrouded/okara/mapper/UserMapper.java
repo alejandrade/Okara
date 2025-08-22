@@ -9,8 +9,10 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring", imports = {TimestampUtils.class})
 public interface UserMapper {
 
+    @Mapping(target = "id", source = "id")
     @Mapping(target = "createdAt", expression = "java(TimestampUtils.toInstant(user.getCreatedAt()))")
     @Mapping(target = "updatedAt", expression = "java(TimestampUtils.toInstant(user.getUpdatedAt()))")
     @Mapping(target = "isPrivate", source = "private")
     UserDto toUserDto(User user);
+    
 }

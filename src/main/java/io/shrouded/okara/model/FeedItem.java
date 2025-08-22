@@ -13,7 +13,6 @@ import java.util.List;
 public class FeedItem {
     private String postId;
     private String authorId;
-    private String authorUsername;
     private String authorDisplayName;
     private String authorProfileImageUrl;
 
@@ -26,20 +25,17 @@ public class FeedItem {
     private Timestamp addedToFeedAt;
 
     private Integer likesCount;
-    private Integer retweetsCount ;
     private Integer commentsCount;
 
-    private Double algorithmScore;
     private List<String> relevanceTags;
     private String reasonShown;
+    private String chatroomId; // Which chatroom this feed item came from
 
     private String originalPostId;
-    private String retweetComment;
 
     public FeedItem(Feed post) {
         this.postId = post.getId();
         this.authorId = post.getAuthorId();
-        this.authorUsername = post.getAuthorUsername();
         this.authorDisplayName = post.getAuthorDisplayName();
         this.authorProfileImageUrl = post.getAuthorProfileImageUrl();
 
@@ -52,12 +48,14 @@ public class FeedItem {
         this.addedToFeedAt = Timestamp.now();
 
         this.likesCount = post.getLikesCount();
-        this.retweetsCount = post.getRetweetsCount();
         this.commentsCount = post.getCommentsCount();
 
-        this.algorithmScore = post.getBaseEngagementScore();
-
         this.originalPostId = post.getOriginalPostId();
-        this.retweetComment = post.getQuoteTweetComment();
+        this.chatroomId = null; // Will be set when creating specific chatroom feed items
+    }
+
+    public FeedItem(Feed post, String chatroomId) {
+        this(post);
+        this.chatroomId = chatroomId;
     }
 }

@@ -1,23 +1,38 @@
 package io.shrouded.okara.repository;
 
-import com.google.cloud.spring.data.firestore.FirestoreReactiveRepository;
-import io.shrouded.okara.enums.UserFeedType;
 import io.shrouded.okara.model.UserFeed;
+import io.shrouded.okara.service.ReactiveFirestoreService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @Repository
-public interface UserFeedRepository extends FirestoreReactiveRepository<UserFeed> {
+@RequiredArgsConstructor
+@Slf4j
+public class UserFeedRepository {
 
-    // Find user's feed by type  
-    Mono<UserFeed> findByUserIdAndFeedType(String userId, UserFeedType feedType);
+    private final ReactiveFirestoreService firestoreService;
+    private static final String COLLECTION_NAME = "user_feeds";
 
-    // Get all feeds for a user (all types)
-    Flux<UserFeed> findByUserId(String userId);
+    public Mono<UserFeed> save(UserFeed userFeed) {
+        return firestoreService.save(COLLECTION_NAME, userFeed,
+            userFeed::getId, (uf, id) -> uf.setId(id));
+    }
 
-    // Delete all feeds for a user (choose one of these signatures)
-    Mono<Void> deleteByUserId(String userId);
-    // or, if you want the number of rows deleted:
-    // Mono<Long> deleteByUserId(String userId);
+    public Mono<UserFeed> findById(String id) {
+        return firestoreService.findById(COLLECTION_NAME, id, 
+            UserFeed.class, (uf, docId) -> uf.setId(docId));
+    }
+
+    // Find user's feed (there's only one per user now)
+    public Mono<UserFeed> findByUserId(String userId) {
+        return firestoreService.findFirstByField(COLLECTION_NAME, "userId", userId, 
+            UserFeed.class, (uf, docId) -> uf.setId(docId));
+    }
+
+    public Mono<Void> delete(UserFeed userFeed) {
+        return firestoreService.delete(COLLECTION_NAME, userFeed, 
+            userFeed::getId);
+    }
 }

@@ -1,19 +1,13 @@
 package io.shrouded.okara.model;
 
 import com.google.cloud.Timestamp;
-import com.google.cloud.firestore.annotation.DocumentId;
-import com.google.cloud.spring.data.firestore.Document;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
 @Data
 @NoArgsConstructor
-@Document(collectionName = "messages")
 public class Message {
     
-    @DocumentId
     private String id;
     private String senderId;
     private String receiverId;

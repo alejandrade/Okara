@@ -66,7 +66,7 @@ public class CurrentUserService {
             log.info("Looking up user by Firebase UID: {}", firebaseUid);
 
             // First try to find user by Firebase UID
-            return userService.findByFirebaseUid(firebaseUid)
+            return userService.findById(firebaseUid)
                               .doOnSuccess(user -> {
                                   if (user != null) {
                                       log.info("Found existing user by UID: {} ",
@@ -78,7 +78,7 @@ public class CurrentUserService {
                               .switchIfEmpty(Mono.defer(() -> {
                                   log.info("User not found by UID: {}", firebaseUid);
                                   // If not found by UID, try by email (for backward compatibility)
-                                  return userService.findByFirebaseUid(firebaseUid)
+                                  return userService.findById(firebaseUid)
                                                     .doOnSuccess(user -> {
                                                         if (user != null) {
                                                             log.info("Found existing user by firebaseUid: {} with ID: {}",
@@ -94,17 +94,15 @@ public class CurrentUserService {
                                                                 "Creating new user from Firebase auth - UID: {}",
                                                                 firebaseUid);
                                                         User newUser = new User();
-                                                        newUser.setId(firebaseUid); // Set the Firebase UID as the user ID
+                                                        newUser.setId(firebaseUid); // Set the Firebase UID
                                                         newUser.setDisplayName(firebaseAuth.getName());
-                                                        newUser.setUsername("anon");
                                                         newUser.setCreatedAt(Timestamp.now());
                                                         newUser.setUpdatedAt(Timestamp.now());
 
                                                         log.info(
-                                                                "New user object created - ID: {}, Email: {}, Username: {}, DisplayName: {}",
+                                                                "New user object created - ID: {}, Email: {}, DisplayName: {}",
                                                                 newUser.getId(),
                                                                 newUser.getEmail(),
-                                                                newUser.getUsername(),
                                                                 newUser.getDisplayName());
 
                                                         // Try to save the user
@@ -115,9 +113,8 @@ public class CurrentUserService {
                                                                                           "User saved successfully with ID: {}",
                                                                                           savedUser.getId());
                                                                                   log.info(
-                                                                                          "Saved user details: Email: {}, Username: {}",
-                                                                                          savedUser.getEmail(),
-                                                                                          savedUser.getUsername());
+                                                                                          "Saved user details: Email: {}",
+                                                                                          savedUser.getEmail());
                                                                               } else {
                                                                                   log.warn("User save returned null");
                                                                               }

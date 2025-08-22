@@ -1,9 +1,6 @@
 package io.shrouded.okara.model;
 
 import com.google.cloud.Timestamp;
-import com.google.cloud.firestore.annotation.DocumentId;
-import com.google.cloud.spring.data.firestore.Document;
-import io.shrouded.okara.enums.UserFeedType;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -13,14 +10,11 @@ import java.util.List;
 
 @Data
 @NoArgsConstructor
-@Document(collectionName = "user_feeds")
 public class UserFeed {
 
     private static final int MAX_FEED_SIZE = 500;
-    @DocumentId
     private String id;
     private String userId;
-    private UserFeedType feedType;
     private LinkedList<FeedItem> items;
     private Timestamp lastUpdated;
     private String nextCursor;
@@ -28,19 +22,14 @@ public class UserFeed {
     private Integer totalItems;
     private Timestamp createdAt;
 
-    public UserFeed(String userId, UserFeedType feedType) {
-        this.id = generateId(userId, feedType);
+    public UserFeed(String userId) {
         this.userId = userId;
-        this.feedType = feedType;
         this.items = new LinkedList<>();
         this.createdAt = Timestamp.now();
         this.lastUpdated = Timestamp.now();
         this.totalItems = 0;
     }
 
-    private String generateId(String userId, UserFeedType feedType) {
-        return String.format("%s_%s", userId, feedType.name().toLowerCase());
-    }
 
     // Firestore compatibility: Ensure getter returns List interface
     public List<FeedItem> getItems() {

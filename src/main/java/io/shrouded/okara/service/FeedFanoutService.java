@@ -3,7 +3,6 @@ package io.shrouded.okara.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.cloud.Timestamp;
 import io.shrouded.okara.dto.event.FeedEvent;
-import io.shrouded.okara.enums.UserFeedType;
 import io.shrouded.okara.model.Feed;
 import io.shrouded.okara.model.FeedItem;
 import io.shrouded.okara.model.User;
@@ -49,26 +48,22 @@ public class FeedFanoutService {
     }
 
     private Mono<Void> handlePostCreated(FeedEvent event) {
-        log.info("Processing POST_CREATED event for post {} by user {}", event.getPostId(), event.getAuthorId());
+        log.info("Processing POST_CREATED event for post {} by user {} to chatrooms {}", 
+                event.getPostId(), event.getAuthorId(), event.getChatroomIds());
 
-        return Mono.zip(
-                           feedRepository.findById(event.getPostId())
-                                         .switchIfEmpty(Mono.error(new RuntimeException("Post not found: " + event.getPostId()))),
-                           userRepository.findById(event.getAuthorId())
-                                         .switchIfEmpty(Mono.error(new RuntimeException("Author not found: " + event.getAuthorId())))
-                   )
-                   .flatMap(tuple -> {
-                       Feed post = tuple.getT1();
-                       User author = tuple.getT2();
+        // Chatrooms are required for post distribution
+        if (event.getChatroomIds() == null || event.getChatroomIds().isEmpty()) {
+            log.error("No chatrooms specified for post {}, cannot distribute", event.getPostId());
+            return Mono.error(new RuntimeException("Chatrooms are required for post distribution"));
+        }
 
-                       // Simple fanout to author's followers
-                       //return fanoutToFollowers(post, author);
-                       return fanoutToDiscovery(post);
-                   })
-                   .onErrorResume(e -> {
-                       log.error("Failed to handle POST_CREATED event: {}", e.getMessage());
-                       return Mono.empty();
-                   });
+        return feedRepository.findById(event.getPostId())
+                             .switchIfEmpty(Mono.error(new RuntimeException("Post not found: " + event.getPostId())))
+                             .flatMap(post -> fanoutToChatrooms(post, event.getChatroomIds()))
+                             .onErrorResume(e -> {
+                                 log.error("Failed to handle POST_CREATED event: {}", e.getMessage());
+                                 return Mono.empty();
+                             });
     }
 
     private Mono<Void> handlePostUpdated(FeedEvent event) {
@@ -76,7 +71,7 @@ public class FeedFanoutService {
 
         return feedRepository.findById(event.getPostId())
                              .switchIfEmpty(Mono.error(new RuntimeException("Post not found: " + event.getPostId())))
-                             .flatMap(post -> updatePostInUserFeeds(post))
+                             .flatMap(this::updatePostInUserFeeds)
                              .onErrorResume(e -> {
                                  log.error("Failed to handle POST_UPDATED event: {}", e.getMessage());
                                  return Mono.empty();
@@ -119,124 +114,60 @@ public class FeedFanoutService {
                 });
     }
 
-    private Mono<Void> fanoutToDiscovery(Feed post) {
-        log.info("Fanning out post {} to discovery", post.getId());
+    private Mono<Void> fanoutToChatrooms(Feed post, List<String> chatroomIds) {
+        log.info("Fanning out post {} to chatrooms {}", post.getId(), chatroomIds);
+        
+        // Find all users who are members of any of the specified chatrooms
         return userRepository.findAll()
+                             .filter(user -> user.getChatrooms() != null && 
+                                           user.getChatrooms().stream()
+                                                              .anyMatch(uc -> chatroomIds.contains(uc.getChatroomId())))
                              .buffer(50)
-                             .flatMap(userBatch -> processFanoutDiscoveryBatch(post, userBatch))
+                             .flatMap(userBatch -> processFanoutChatroomBatch(post, userBatch, chatroomIds))
                              .then();
     }
 
-    private Mono<Void> processFanoutDiscoveryBatch(Feed post, List<User> users) {
-        log.debug("Processing discovery fanout batch of {} users for post {}", users.size(), post.getId());
+    private Mono<Void> processFanoutChatroomBatch(Feed post, List<User> users, List<String> chatroomIds) {
+        log.debug("Processing chatroom fanout batch of {} users for post {} to chatrooms {}", 
+                 users.size(), post.getId(), chatroomIds);
 
-        List<Mono<UserFeed>> feedOperations = new ArrayList<>();
-
-        // Prepare all user feeds for this batch
+        List<Mono<UserFeed>> userFeedUpdates = new ArrayList<>();
+        
         for (User user : users) {
-            feedOperations.add(
-                    getUserFeed(user.getId(), UserFeedType.PERSONAL)
+            // For each chatroom this user is in that the post was sent to
+            for (String chatroomId : chatroomIds) {
+                boolean userInChatroom = user.getChatrooms().stream()
+                                            .anyMatch(uc -> uc.getChatroomId().equals(chatroomId));
+                
+                if (userInChatroom) {
+                    // Create FeedItem for this specific chatroom
+                    FeedItem feedItem = new FeedItem(post, chatroomId);
+                    feedItem.setReasonShown("From chatroom");
+                    
+                    // Find or create user's feed and add the item
+                    Mono<UserFeed> userFeedUpdate = userFeedRepository.findByUserId(user.getId())
+                            .switchIfEmpty(Mono.fromCallable(() -> new UserFeed(user.getId())))
                             .map(userFeed -> {
-                                userFeed.addItem(new FeedItem(post));
+                                userFeed.addItem(feedItem);
                                 return userFeed;
                             })
-                            .onErrorResume(e -> {
-                                log.error("Failed to prepare feed for user {}: {}", user.getId(), e.getMessage());
-                                return Mono.empty();
-                            })
-            );
+                            .flatMap(userFeedRepository::save);
+                    
+                    userFeedUpdates.add(userFeedUpdate);
+                    break; // Only add once per user, even if they're in multiple target chatrooms
+                }
+            }
         }
 
-        // Execute all feed preparations and then batch save
-        return Flux.fromIterable(feedOperations)
-                   .flatMap(operation -> operation)
-                   .collectList()
-                   .filter(feeds -> !feeds.isEmpty())
-                   .flatMap(feeds -> userFeedRepository.saveAll(feeds).then())
-                   .onErrorResume(e -> {
-                       log.error("Failed to batch save feeds for discovery fanout: {}", e.getMessage());
-                       return Mono.empty();
-                   });
+        return Mono.when(userFeedUpdates)
+                   .doOnSuccess(v -> log.debug("Successfully updated {} user feeds for chatroom fanout", userFeedUpdates.size()));
     }
 
-    private Mono<Void> fanoutToFollowers(Feed post, User author) {
-        log.info("Fanning out post {} to {} followers", post.getId(), author.getFollowersCount());
-
-        List<String> followers = author.getFollowers() != null
-                ? new ArrayList<>(author.getFollowers())
-                : new ArrayList<>();
-
-        // Always include the author themself so their posts appear in their own feed
-        if (!followers.contains(author.getId())) {
-            followers.add(author.getId());
-        }
-
-        // Process followers in batches to avoid overwhelming the system
-        int batchSize = 100;
-        List<Mono<Void>> batchOperations = new ArrayList<>();
-
-        for (int i = 0; i < followers.size(); i += batchSize) {
-            int endIndex = Math.min(i + batchSize, followers.size());
-            List<String> batch = followers.subList(i, endIndex);
-
-            // Process batch
-            batchOperations.add(processFanoutBatch(post, batch));
-        }
-
-        return Flux.fromIterable(batchOperations)
-                   .flatMap(operation -> operation)
-                   .then();
-    }
-
-    private Mono<Void> processFanoutBatch(Feed post, List<String> followerIds) {
-        List<Mono<Void>> operations = new ArrayList<>();
-
-        for (String followerId : followerIds) {
-            operations.add(
-                    userRepository.findById(followerId)
-                                  .flatMap(follower -> {
-                                      // Create simple feed item without algorithmic scoring
-                                      FeedItem feedItem = new FeedItem(post);
-
-                                      // Add to personal feed only
-                                      return addToUserFeed(followerId, UserFeedType.PERSONAL, feedItem);
-                                  })
-                                  .onErrorResume(e -> {
-                                      log.error("Failed to add post {} to follower {} feed: {}",
-                                                post.getId(),
-                                                followerId,
-                                                e.getMessage());
-                                      return Mono.empty();
-                                  })
-            );
-        }
-
-        return Flux.fromIterable(operations)
-                   .flatMap(operation -> operation)
-                   .then();
-    }
-
-    private Mono<Void> addToUserFeed(String userId, UserFeedType feedType, FeedItem feedItem) {
-        return getUserFeed(userId, feedType)
-                .flatMap(userFeed -> {
-                    // Add the item
-                    userFeed.addItem(feedItem);
-
-                    // Save
-                    return userFeedRepository.save(userFeed);
-                })
-                .then()
-                .onErrorResume(e -> {
-                    log.error("Failed to add item to user {} feed {}: {}", userId, feedType, e.getMessage());
-                    return Mono.empty();
-                });
-    }
-
-    private Mono<UserFeed> getUserFeed(String userId, UserFeedType feedType) {
-        return userFeedRepository.findByUserIdAndFeedType(userId, feedType)
+    private Mono<UserFeed> getUserFeed(String userId) {
+        return userFeedRepository.findByUserId(userId)
                                  .switchIfEmpty(Mono.defer(() -> {
                                      // Create new feed
-                                     return Mono.just(new UserFeed(userId, feedType));
+                                     return Mono.just(new UserFeed(userId));
                                  }));
     }
 
@@ -265,7 +196,6 @@ public class FeedFanoutService {
                    )
                    .flatMap(tuple -> {
                        List<Feed> recentPosts = tuple.getT1();
-                       User follower = tuple.getT2();
 
                        if (recentPosts.isEmpty()) {
                            return Mono.empty();
@@ -275,12 +205,12 @@ public class FeedFanoutService {
                        List<FeedItem> feedItems = new ArrayList<>();
                        for (Feed post : recentPosts) {
                            FeedItem feedItem = new FeedItem(post);
-                           feedItem.setReasonShown("From " + post.getAuthorUsername() + " (recently followed)");
+                           feedItem.setReasonShown("From " + post.getAuthorDisplayName() + " (recently followed)");
                            feedItems.add(feedItem);
                        }
 
                        // Add to personal feed only
-                       return getUserFeed(followerId, UserFeedType.PERSONAL)
+                       return getUserFeed(followerId)
                                .flatMap(personalFeed -> {
                                    personalFeed.addItems(feedItems);
                                    return userFeedRepository.save(personalFeed);
@@ -298,28 +228,17 @@ public class FeedFanoutService {
         log.info("Removing posts from user {} feed for unfollowed user {}", followerId, unfollowedId);
 
         return userFeedRepository.findByUserId(followerId)
-                                 .collectList()
-                                 .flatMap(userFeeds -> {
-                                     List<Mono<UserFeed>> saveOperations = new ArrayList<>();
+                                 .flatMap(userFeed -> {
+                                     boolean modified = userFeed.getItems()
+                                                               .removeIf(item -> unfollowedId.equals(item.getAuthorId()));
 
-                                     for (UserFeed feed : userFeeds) {
-                                         boolean modified = feed.getItems()
-                                                                .removeIf(item -> unfollowedId.equals(item.getAuthorId()));
-
-                                         if (modified) {
-                                             feed.setTotalItems(feed.getItems().size());
-                                             feed.setLastUpdated(Timestamp.now());
-                                             saveOperations.add(userFeedRepository.save(feed));
-                                         }
-                                     }
-
-                                     if (saveOperations.isEmpty()) {
+                                     if (modified) {
+                                         userFeed.setTotalItems(userFeed.getItems().size());
+                                         userFeed.setLastUpdated(Timestamp.now());
+                                         return userFeedRepository.save(userFeed).then();
+                                     } else {
                                          return Mono.empty();
                                      }
-
-                                     return Flux.fromIterable(saveOperations)
-                                                .flatMap(operation -> operation)
-                                                .then();
                                  })
                                  .onErrorResume(e -> {
                                      log.error("Failed to remove posts from user {} feed: {}",

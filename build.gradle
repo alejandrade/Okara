@@ -30,12 +30,12 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
     
     // Firebase Admin SDK
     implementation 'com.google.firebase:firebase-admin:9.4.1'
-    
-    // Google Cloud Datastore (temporarily back to this to get it working)
-    implementation("com.google.cloud:spring-cloud-gcp-starter-data-firestore:7.1.0")
+    // Google Cloud Firestore Client (direct client for better control)
+    implementation 'com.google.cloud:google-cloud-firestore'
     // Google Cloud Pub/Sub
     implementation 'com.google.cloud:spring-cloud-gcp-starter-pubsub:7.1.0'
     // Google Cloud Storage

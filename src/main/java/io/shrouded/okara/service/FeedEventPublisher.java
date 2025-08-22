@@ -28,14 +28,16 @@ public class FeedEventPublisher {
                                        .eventType(FeedEventType.POST_CREATED)
                                        .postId(post.getId())
                                        .authorId(post.getAuthorId())
-                                       .authorUsername(post.getAuthorUsername())
+                                       .authorUsername(post.getAuthorDisplayName())
                                        .content(post.getContent())
                                        .createdAt(post.getCreatedAt().toString())
+                                       .chatroomIds(post.getChatroomIds()) // Include chatrooms for distribution
                                        .metadata(createMetadata(post))
                                        .build();
 
             publishEvent(event);
-            log.info("Published POST_CREATED event for post {} by user {}", post.getId(), post.getAuthorId());
+            log.info("Published POST_CREATED event for post {} by user {} to chatrooms {}", 
+                    post.getId(), post.getAuthorId(), post.getChatroomIds());
 
         } catch (Exception e) {
             log.error("Failed to publish POST_CREATED event for post {}: {}", post.getId(), e.getMessage());
@@ -49,14 +51,16 @@ public class FeedEventPublisher {
                                        .eventType(FeedEventType.POST_UPDATED)
                                        .postId(post.getId())
                                        .authorId(post.getAuthorId())
-                                       .authorUsername(post.getAuthorUsername())
+                                       .authorUsername(post.getAuthorDisplayName())
                                        .content(post.getContent())
                                        .createdAt(post.getCreatedAt().toString())
+                                       .chatroomIds(post.getChatroomIds()) // Include chatrooms for distribution
                                        .metadata(createMetadata(post))
                                        .build();
 
             publishEvent(event);
-            log.info("Published POST_UPDATED event for post {} by user {}", post.getId(), post.getAuthorId());
+            log.info("Published POST_UPDATED event for post {} by user {} to chatrooms {}", 
+                    post.getId(), post.getAuthorId(), post.getChatroomIds());
 
         } catch (Exception e) {
             log.error("Failed to publish POST_UPDATED event for post {}: {}", post.getId(), e.getMessage());
@@ -123,6 +127,7 @@ public class FeedEventPublisher {
                               .setHeader("eventType", event.getEventType().name())
                               .setHeader("postId", event.getPostId())
                               .setHeader("authorId", event.getAuthorId())
+                              .setHeader("chatroomIds", event.getChatroomIds()) // Include chatroom IDs in headers
                               .build()
         );
     }
@@ -131,9 +136,7 @@ public class FeedEventPublisher {
         return FeedEventMetadata.forPost(
             post.getType(),
             post.getLikesCount(),
-            post.getRetweetsCount(),
             post.getCommentsCount(),
-            post.getBaseEngagementScore(),
             post.getHashtags(),
             post.getMentions(),
             post.getImageUrls() != null && !post.getImageUrls().isEmpty(),

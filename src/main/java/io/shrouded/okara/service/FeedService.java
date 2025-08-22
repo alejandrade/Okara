@@ -13,6 +13,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -34,15 +35,16 @@ public class FeedService {
     /**
      * Create a main post (reactive)
      */
-    public Mono<Feed> createPost(String authorId, String content, List<String> imageUrls, String videoUrl) {
+    public Mono<Feed> createPost(String authorId, String content, List<String> imageUrls, String videoUrl, List<String> chatroomIds) {
         return userRepository.findById(authorId)
                              .switchIfEmpty(Mono.error(new RuntimeException("User not found")))
                              .flatMap(author -> {
-                                 Feed post = new Feed(authorId, author.getUsername(), content, FeedType.POST);
+                                 Feed post = new Feed(authorId, content, FeedType.POST);
                                  post.setAuthorDisplayName(author.getDisplayName());
                                  post.setAuthorProfileImageUrl(author.getProfileImageUrl());
                                  post.setImageUrls(imageUrls);
                                  post.setVideoUrl(videoUrl);
+                                 post.setChatroomIds(chatroomIds);
                                  post.setHashtags(extractHashtags(content));
                                  post.setMentions(extractMentions(content));
                                  return feedRepository.save(post)
@@ -79,7 +81,7 @@ public class FeedService {
                        User author = tuple.getT1();
                        Feed parentPost = tuple.getT2();
 
-                       Feed comment = new Feed(authorId, author.getUsername(), content, FeedType.COMMENT);
+                       Feed comment = new Feed(authorId, content, FeedType.COMMENT);
                        comment.setAuthorDisplayName(author.getDisplayName());
                        comment.setAuthorProfileImageUrl(author.getProfileImageUrl());
                        comment.setParentId(parentId);
@@ -171,13 +173,8 @@ public class FeedService {
         return feedRepository.findById(postId)
                              .switchIfEmpty(Mono.error(new RuntimeException("Post not found")))
                              .flatMap(post -> {
-                                 if (post.getRetweetedBy().contains(userId)) {
-                                     post.getRetweetedBy().remove(userId);
-                                     post.setRetweetsCount(Math.max(0, post.getRetweetsCount() - 1));
-                                 } else {
-                                     post.getRetweetedBy().add(userId);
-                                     post.setRetweetsCount(post.getRetweetsCount() + 1);
-                                 }
+                                 // Retweet functionality removed - method kept for compatibility
+                                 // TODO: Consider removing this method entirely
                                  post.setUpdatedAt(Timestamp.now());
                                  return calculateAndUpdateEngagementScore(post)
                                          .flatMap(feedRepository::save);
@@ -198,19 +195,17 @@ public class FeedService {
                        User user = tuple.getT1();
                        Feed originalPost = tuple.getT2();
 
-                       Feed qt = new Feed(userId, user.getUsername(), comment, FeedType.QUOTE_TWEET);
+                       Feed qt = new Feed(userId, comment, FeedType.QUOTE_TWEET);
                        qt.setAuthorDisplayName(user.getDisplayName());
                        qt.setAuthorProfileImageUrl(user.getProfileImageUrl());
                        qt.setOriginalPostId(originalPostId);
-                       qt.setQuoteTweetComment(comment);
                        qt.setHashtags(extractHashtags(comment));
                        qt.setMentions(extractMentions(comment));
 
                        return feedRepository.save(qt)
                                             .flatMap(savedQT -> {
-                                                if (!originalPost.getRetweetedBy().contains(userId)) {
-                                                    originalPost.getRetweetedBy().add(userId);
-                                                    originalPost.setRetweetsCount(originalPost.getRetweetsCount() + 1);
+                                                // Retweet functionality removed - quote tweet without affecting retweet count
+                                                if (true) { // Always execute the update logic for quote tweets
                                                     originalPost.setUpdatedAt(Timestamp.now());
                                                     return calculateAndUpdateEngagementScore(originalPost)
                                                             .flatMap(feedRepository::save)
@@ -223,6 +218,11 @@ public class FeedService {
 
     public Flux<Feed> getUserFeed(String userId) {
         return feedRepository.findByAuthorIdAndParentIdIsNull(userId);
+    }
+
+    public Mono<List<Feed>> getChatroomFeed(String chatroomId, int limit, String sinceId) {
+        return feedRepository.findByChatroomIdsContaining(chatroomId)
+                            .collectList();
     }
 
     public Flux<Feed> getComments(String postId) {
@@ -337,16 +337,16 @@ public class FeedService {
                 .map(commentScore -> {
                     double score = 0.0;
                     score += post.getLikesCount() * 1.0;
-                    score += post.getRetweetsCount() * 1.5;
+                    // score += post.getRetweetsCount() * 1.5; // Removed retweetsCount
                     score += commentScore;
                     score += calculateTimeDecay(post.getCreatedAt());
-                    post.setBaseEngagementScore(score);
+                    // post.setBaseEngagementScore(score); // Removed baseEngagementScore
                     log.debug(
                             "Updated engagement score for post {}: {} (likes: {}, retweets: {}, distinctCommenters: {})",
                             post.getId(),
                             score,
                             post.getLikesCount(),
-                            post.getRetweetsCount(),
+                            // post.getRetweetsCount(), // Removed retweetsCount
                             post.getDistinctCommentersCount());
                     return post;
                 });
@@ -417,5 +417,39 @@ public class FeedService {
                                  post.setDistinctCommentersCount(cnt.intValue());
                                  return post;
                              });
+    }
+
+    /**
+     * Cross-post an existing post to additional chatrooms
+     */
+    public Mono<Feed> crossPost(String userId, String postId, List<String> additionalChatroomIds) {
+        return feedRepository.findById(postId)
+                            .switchIfEmpty(Mono.error(new RuntimeException("Post not found")))
+                            .flatMap(post -> {
+                                // Verify user is the author of the post
+                                if (!post.getAuthorId().equals(userId)) {
+                                    return Mono.error(new RuntimeException("You can only cross-post your own posts"));
+                                }
+
+                                // Add new chatrooms to existing ones (avoiding duplicates)
+                                List<String> currentChatrooms = post.getChatroomIds() != null ? 
+                                    new ArrayList<>(post.getChatroomIds()) : new ArrayList<>();
+                                
+                                for (String chatroomId : additionalChatroomIds) {
+                                    if (!currentChatrooms.contains(chatroomId)) {
+                                        currentChatrooms.add(chatroomId);
+                                    }
+                                }
+                                
+                                post.setChatroomIds(currentChatrooms);
+                                post.setUpdatedAt(Timestamp.now());
+
+                                return feedRepository.save(post)
+                                                    .flatMap(savedPost -> {
+                                                        // Publish event for the new chatrooms only
+                                                        feedEventPublisher.publishPostCreated(savedPost);
+                                                        return Mono.just(savedPost);
+                                                    });
+                            });
     }
 }

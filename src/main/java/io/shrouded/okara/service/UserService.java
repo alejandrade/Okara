@@ -1,9 +1,6 @@
 package io.shrouded.okara.service;
 
 import com.google.cloud.Timestamp;
-import com.google.cloud.firestore.DocumentReference;
-import com.google.cloud.firestore.Firestore;
-import com.google.cloud.spring.data.firestore.FirestoreReactiveOperations;
 import com.google.firebase.auth.FirebaseAuthException;
 import io.shrouded.okara.model.User;
 import io.shrouded.okara.repository.UserRepository;
@@ -22,6 +19,7 @@ public class UserService {
     private final FirebaseAuthService firebaseAuthService;
     private final FeedEventPublisher feedEventPublisher;
     private final PersonalFeedService personalFeedService;
+    private final ChatroomService chatroomService;
 
     public Mono<User> getOrCreateUser(String jwtToken, String fcmToken) {
         return Mono.fromCallable(() -> firebaseAuthService.verifyToken(jwtToken))
@@ -29,8 +27,8 @@ public class UserService {
                        String firebaseUid = decodedToken.getUid();
                        String picture = (String) decodedToken.getClaims().get("picture");
 
-                       // Check if user exists by email
-                       return userRepository.findByFirebaseUid(firebaseUid)
+                       // Check if user exists by Firebase UID
+                       return userRepository.findById(firebaseUid)
                                             .flatMap(existingUser -> {
                                                 // Update FCM token for existing user
                                                 if (fcmToken != null && fcmToken.equals(existingUser.getFcmToken())) {
@@ -45,8 +43,7 @@ public class UserService {
                                                 // Create new user
 
                                                 User newUser = new User();
-                                                newUser.setFirebaseUid(firebaseUid);
-                                                newUser.setUsername("anon");
+                                                newUser.setId(firebaseUid);
                                                 newUser.setProfileImageUrl(picture);
                                                 newUser.setFcmToken(fcmToken);
                                                 newUser.setCreatedAt(Timestamp.now());
@@ -54,13 +51,13 @@ public class UserService {
 
                                                 return userRepository.save(newUser)
                                                                      .publishOn(Schedulers.boundedElastic())
-                                                                     .doOnSuccess(savedUser -> {
+                                                                     .flatMap(savedUser -> {
                                                                          log.info(
-                                                                                 "New user created: {} with firebaseUid: {}",
+                                                                                 "New user created with firebaseUid: {}",
                                                                                  firebaseUid);
 
-                                                                         // Initialize personal feed for new user
-                                                                         personalFeedService.initializeUserFeed(
+                                                                         // Initialize personal feed for new user and wait for completion
+                                                                         Mono<Void> feedInit = personalFeedService.initializeUserFeed(
                                                                                                     savedUser.getId())
                                                                                             .onErrorResume(e -> {
                                                                                                 log.error(
@@ -69,7 +66,17 @@ public class UserService {
                                                                                                         e.getMessage());
                                                                                                 return Mono.empty();
                                                                                             })
-                                                                                            .subscribe();
+                                                                                            .then();
+
+                                                                         // Add user to default chatrooms and wait for completion
+                                                                         Mono<Void> chatroomSetup = chatroomService.addUserToDefaultChatrooms(
+                                                                                                    savedUser.getId())
+                                                                                        .then();
+
+                                                                         // Wait for both operations to complete before returning the user
+                                                                         return feedInit
+                                                                                  .then(chatroomSetup)
+                                                                                  .thenReturn(savedUser);
                                                                      });
                                             }));
                    })
@@ -83,19 +90,19 @@ public class UserService {
         return userRepository.findByUsername(username);
     }
 
-    public Mono<User> findByFirebaseUid(String firebaseUid) {
-        return userRepository.findByFirebaseUid(firebaseUid);
+    public Mono<User> findById(String firebaseUid) {
+        return userRepository.findById(firebaseUid);
     }
 
     public Mono<User> saveUser(User newUser) {
         return userRepository.save(newUser);
     }
 
-    public Mono<User> followUser(String followerId, String followeeId) {
+    public Mono<User> followUser(String followerFirebaseUid, String followeeFirebaseUid) {
         return Mono.zip(
-                           userRepository.findById(followerId)
+                           userRepository.findById(followerFirebaseUid)
                                          .switchIfEmpty(Mono.error(new RuntimeException("Follower not found"))),
-                           userRepository.findById(followeeId)
+                           userRepository.findById(followeeFirebaseUid)
                                          .switchIfEmpty(Mono.error(new RuntimeException("User to follow not found")))
                    )
                    .flatMap(tuple -> {
@@ -103,12 +110,12 @@ public class UserService {
                        User followee = tuple.getT2();
 
                        // Add to following/followers lists
-                       if (!follower.getFollowing().contains(followeeId)) {
-                           follower.getFollowing().add(followeeId);
+                       if (!follower.getFollowing().contains(followeeFirebaseUid)) {
+                           follower.getFollowing().add(followeeFirebaseUid);
                            follower.setFollowingCount(follower.getFollowingCount() + 1);
                            follower.setUpdatedAt(Timestamp.now());
 
-                           followee.getFollowers().add(followerId);
+                           followee.getFollowers().add(followerFirebaseUid);
                            followee.setFollowersCount(followee.getFollowersCount() + 1);
                            followee.setUpdatedAt(Timestamp.now());
 
@@ -119,7 +126,7 @@ public class UserService {
                                       .flatMap(savedUsers -> {
                                           // Publish follow event for feed fanout
                                           try {
-                                              feedEventPublisher.publishUserFollowed(followerId, followeeId);
+                                              feedEventPublisher.publishUserFollowed(followerFirebaseUid, followeeFirebaseUid);
                                           } catch (Exception e) {
                                               log.error("Failed to publish user followed event: {}", e.getMessage());
                                           }
@@ -131,11 +138,11 @@ public class UserService {
                    });
     }
 
-    public Mono<User> unfollowUser(String followerId, String followeeId) {
+    public Mono<User> unfollowUser(String followerFirebaseUid, String followeeFirebaseUid) {
         return Mono.zip(
-                           userRepository.findById(followerId)
+                           userRepository.findById(followerFirebaseUid)
                                          .switchIfEmpty(Mono.error(new RuntimeException("Follower not found"))),
-                           userRepository.findById(followeeId)
+                           userRepository.findById(followeeFirebaseUid)
                                          .switchIfEmpty(Mono.error(new RuntimeException("User to unfollow not found")))
                    )
                    .flatMap(tuple -> {
@@ -143,12 +150,12 @@ public class UserService {
                        User followee = tuple.getT2();
 
                        // Remove from following/followers lists
-                       if (follower.getFollowing().contains(followeeId)) {
-                           follower.getFollowing().remove(followeeId);
+                       if (follower.getFollowing().contains(followeeFirebaseUid)) {
+                           follower.getFollowing().remove(followeeFirebaseUid);
                            follower.setFollowingCount(follower.getFollowingCount() - 1);
                            follower.setUpdatedAt(Timestamp.now());
 
-                           followee.getFollowers().remove(followerId);
+                           followee.getFollowers().remove(followerFirebaseUid);
                            followee.setFollowersCount(followee.getFollowersCount() - 1);
                            followee.setUpdatedAt(Timestamp.now());
 
@@ -159,7 +166,7 @@ public class UserService {
                                       .flatMap(savedUsers -> {
                                           // Publish unfollow event for feed cleanup
                                           try {
-                                              feedEventPublisher.publishUserUnfollowed(followerId, followeeId);
+                                              feedEventPublisher.publishUserUnfollowed(followerFirebaseUid, followeeFirebaseUid);
                                           } catch (Exception e) {
                                               log.error("Failed to publish user unfollowed event: {}", e.getMessage());
                                           }
@@ -171,8 +178,8 @@ public class UserService {
                    });
     }
 
-    public Mono<User> updateProfile(String userId, String displayName, String bio, String location, String website) {
-        return userRepository.findById(userId)
+    public Mono<User> updateProfile(String firebaseUid, String displayName, String bio, String location, String website) {
+        return userRepository.findById(firebaseUid)
                              .switchIfEmpty(Mono.error(new RuntimeException("User not found")))
                              .flatMap(user -> {
                                  if (displayName != null) {
@@ -193,5 +200,44 @@ public class UserService {
                              });
     }
 
+    public Mono<User> mergeAccounts(String anonymousUserToken, String newUserToken) {
+        return Mono.fromCallable(() -> firebaseAuthService.verifyToken(anonymousUserToken))
+                   .flatMap(anonymousToken -> {
+                       String anonymousFirebaseUid = anonymousToken.getUid();
+                       
+                       return Mono.fromCallable(() -> firebaseAuthService.verifyToken(newUserToken))
+                                  .flatMap(newUserTokenData -> {
+                                      String newUserFirebaseUid = newUserTokenData.getUid();
+                                      
+                                      // Find the anonymous user
+                                      return userRepository.findById(anonymousFirebaseUid)
+                                                           .switchIfEmpty(Mono.error(new RuntimeException("Anonymous user not found")))
+                                                           .flatMap(anonymousUser -> {
+                                                               // Update the anonymous user's Firebase UID to the new one
+                                                               anonymousUser.setId(newUserFirebaseUid);
+                                                               // Save the updated user
+                                                               return userRepository.save(anonymousUser)
+                                                                                    .flatMap(mergedUser -> {
+                                                                                        log.info("Successfully merged anonymous user {} with new user {}", 
+                                                                                                anonymousFirebaseUid, newUserFirebaseUid);
+                                                                                        
+                                                                                        // Delete the anonymous user's Firebase account after successful merge
+                                                                                        return firebaseAuthService.deleteUser(anonymousFirebaseUid)
+                                                                                                    .doOnSuccess(v -> log.info("Successfully deleted anonymous Firebase account: {}", anonymousFirebaseUid))
+                                                                                                    .onErrorResume(e -> {
+                                                                                        log.warn("Failed to delete anonymous Firebase account {}: {}", anonymousFirebaseUid, e.getMessage());
+                                                                                        // Don't fail the merge if Firebase deletion fails
+                                                                                        return Mono.empty();
+                                                                                    })
+                                                                                                    .then(Mono.just(mergedUser));
+                                                                                    });
+                                                           });
+                                  });
+                   })
+                   .onErrorResume(FirebaseAuthException.class, e -> {
+                       log.error("Firebase auth error during account merge: {}", e.getMessage());
+                       return Mono.error(e);
+                   });
+    }
 
 }

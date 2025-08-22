@@ -12,7 +12,6 @@ import java.util.List;
 public record FeedDto(
         String id,
         String authorId,
-        String authorUsername,
         String authorDisplayName,
         String authorProfileImageUrl,
         String content,
@@ -25,19 +24,15 @@ public record FeedDto(
         Instant updatedAt,
         List<String> likedBy,
         List<String> dislikedBy,
-        List<String> retweetedBy,
         Integer likesCount,
         Integer dislikesCount,
-        Integer retweetsCount,
         Integer commentsCount,
         Integer viewsCount,
-        Double baseEngagementScore,
         Integer distinctCommentersCount,
         List<String> niches,
         String originalPostId,
-        String quoteTweetComment,
-        Boolean isPinned,
         List<String> hashtags,
-        List<String> mentions
+        List<String> mentions,
+        List<String> chatroomIds
 ) {
 }
