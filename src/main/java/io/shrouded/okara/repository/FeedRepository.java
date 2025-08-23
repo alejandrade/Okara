@@ -21,7 +21,7 @@ public class FeedRepository {
 
     public Mono<Feed> save(Feed feed) {
         return firestoreService.save(COLLECTION_NAME, feed, 
-            feed::getId, (f, id) -> f.setId(id));
+            feed.getId(), (f, id) -> f.setId(id));
     }
 
     public Mono<Feed> findById(String id) {
@@ -49,12 +49,11 @@ public class FeedRepository {
     }
 
 
-    public Mono<Void> deleteById(String id) {
-        return firestoreService.deleteById(COLLECTION_NAME, id);
+    public Mono<Void> delete(Feed feed) {
+        return firestoreService.deleteById(COLLECTION_NAME, feed.getId());
     }
 
-    public Mono<Void> delete(Feed feed) {
-        return firestoreService.delete(COLLECTION_NAME, feed, 
-            feed::getId);
+    public Mono<Void> deleteById(String id) {
+        return firestoreService.deleteById(COLLECTION_NAME, id);
     }
 }

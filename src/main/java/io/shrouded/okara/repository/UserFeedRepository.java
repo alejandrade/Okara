@@ -17,7 +17,7 @@ public class UserFeedRepository {
 
     public Mono<UserFeed> save(UserFeed userFeed) {
         return firestoreService.save(COLLECTION_NAME, userFeed,
-            userFeed::getId, (uf, id) -> uf.setId(id));
+            userFeed.getId(), (uf, id) -> uf.setId(id));
     }
 
     public Mono<UserFeed> findById(String id) {
@@ -32,7 +32,6 @@ public class UserFeedRepository {
     }
 
     public Mono<Void> delete(UserFeed userFeed) {
-        return firestoreService.delete(COLLECTION_NAME, userFeed, 
-            userFeed::getId);
+        return firestoreService.deleteById(COLLECTION_NAME, userFeed.getId());
     }
 }

@@ -20,7 +20,7 @@ public class ViewEventRepository {
 
     public Mono<ViewEvent> save(ViewEvent viewEvent) {
         return firestoreService.save(COLLECTION_NAME, viewEvent, 
-            viewEvent::getId, (ve, id) -> ve.setId(id));
+            viewEvent.getId(), (ve, id) -> ve.setId(id));
     }
 
     public Mono<ViewEvent> findById(String id) {
@@ -70,11 +70,6 @@ public class ViewEventRepository {
     }
 
     public Mono<Void> delete(ViewEvent viewEvent) {
-        return firestoreService.delete(COLLECTION_NAME, viewEvent, 
-            viewEvent::getId);
-    }
-
-    public Mono<Void> deleteById(String id) {
-        return firestoreService.deleteById(COLLECTION_NAME, id);
+        return firestoreService.deleteById(COLLECTION_NAME, viewEvent.getId());
     }
 }

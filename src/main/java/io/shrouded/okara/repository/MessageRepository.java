@@ -19,7 +19,7 @@ public class MessageRepository {
 
     public Mono<Message> save(Message message) {
         return firestoreService.save(COLLECTION_NAME, message, 
-            message::getId, (m, id) -> m.setId(id));
+            message.getId(), (m, id) -> m.setId(id));
     }
 
     public Mono<Message> findById(String id) {
@@ -55,11 +55,7 @@ public class MessageRepository {
     }
 
     public Mono<Void> delete(Message message) {
-        return firestoreService.delete(COLLECTION_NAME, message, 
-            message::getId);
+        return firestoreService.deleteById(COLLECTION_NAME, message.getId());
     }
 
-    public Mono<Void> deleteById(String id) {
-        return firestoreService.deleteById(COLLECTION_NAME, id);
-    }
 }

@@ -24,13 +24,13 @@ public class User {
     private Timestamp createdAt;
     private Timestamp updatedAt;
 
-    private List<String> following;
-    private List<String> followers;
+    private List<String> following = new ArrayList<>();
+    private List<String> followers = new ArrayList<>();
 
-    private Integer followingCount;
-    private Integer followersCount;
-    private Integer postsCount;
-    private Integer totalViewsCount;
+    private Integer followingCount = 0;
+    private Integer followersCount = 0;
+    private Integer postsCount = 0;
+    private Integer totalViewsCount = 0;
 
     private boolean verified;
     private boolean isPrivate;

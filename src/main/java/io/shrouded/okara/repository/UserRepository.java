@@ -18,7 +18,7 @@ public class UserRepository {
 
     public Mono<User> save(User user) {
         return firestoreService.save(COLLECTION_NAME, user, 
-            user::getId, (u, id) -> u.setId(id));
+            user.getId(), (u, id) -> u.setId(id));
     }
 
     public Mono<User> findById(String id) {
@@ -44,11 +44,7 @@ public class UserRepository {
     }
 
     public Mono<Void> delete(User user) {
-        return firestoreService.delete(COLLECTION_NAME, user, 
-            user::getId);
+        return firestoreService.deleteById(COLLECTION_NAME, user.getId());
     }
 
-    public Mono<Void> deleteById(String id) {
-        return firestoreService.deleteById(COLLECTION_NAME, id);
-    }
 }
