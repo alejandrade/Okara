@@ -22,12 +22,22 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Authentication", description = "User authentication and account management endpoints")
 public class AuthController {
 
     private final UserService userService;
@@ -36,8 +46,18 @@ public class AuthController {
     private final UserDeleteService userDeleteService;
 
     @PostMapping("/login")
-    public Mono<UserDto> loginOrRegister(@RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader,
-                                         @RequestBody LoginRequest loginRequest) {
+    @Operation(summary = "Login or register user", description = "Authenticates a user with Firebase token and creates account if needed")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Authentication successful",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserDto.class))),
+        @ApiResponse(responseCode = "401", description = "Authentication failed",
+                content = @Content)
+    })
+    public Mono<UserDto> loginOrRegister(
+            @Parameter(description = "Firebase authentication token", required = true)
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader,
+            @Parameter(description = "Login request with FCM token", required = true)
+            @RequestBody LoginRequest loginRequest) {
         log.info("🔐 LOGIN/REGISTER ENDPOINT HIT!");
         String token = authHeader.substring(7);
         return userService.getOrCreateUser(token, loginRequest.fcmToken())
@@ -52,20 +72,52 @@ public class AuthController {
     }
 
     @GetMapping("/me")
+    @Operation(summary = "Get current user", description = "Retrieves the authenticated user's profile")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "User profile retrieved successfully",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserDto.class))),
+        @ApiResponse(responseCode = "401", description = "Unauthorized",
+                content = @Content)
+    })
     public Mono<UserDto> getCurrentUser() {
         return currentUserService.getCurrentUser()
                                  .map(userMapper::toUserDto);
     }
 
     @GetMapping("/users/{username}")
-    public Mono<UserDto> getUserByUsername(@PathVariable String username) {
+    @Operation(summary = "Get user by username", description = "Retrieves a user's public profile by username")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "User found",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserDto.class))),
+        @ApiResponse(responseCode = "404", description = "User not found",
+                content = @Content),
+        @ApiResponse(responseCode = "401", description = "Unauthorized",
+                content = @Content)
+    })
+    public Mono<UserDto> getUserByUsername(
+            @Parameter(description = "Username to search for", required = true)
+            @PathVariable String username) {
         return userService.findByUsername(username)
                           .map(userMapper::toUserDto)
                           .switchIfEmpty(Mono.error(OkaraException.notFound("user")));
     }
 
     @PostMapping("/follow/{userId}")
-    public Mono<UserDto> followUser(@PathVariable String userId) {
+    @Operation(summary = "Follow user", description = "Follow another user to see their posts in your feed")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "User followed successfully",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserDto.class))),
+        @ApiResponse(responseCode = "404", description = "User not found",
+                content = @Content),
+        @ApiResponse(responseCode = "401", description = "Unauthorized",
+                content = @Content)
+    })
+    public Mono<UserDto> followUser(
+            @Parameter(description = "ID of the user to follow", required = true)
+            @PathVariable String userId) {
         return currentUserService.getCurrentUser()
                                  .flatMap(currentUser -> userService.followUser(
                                                                             currentUser.getId(),
@@ -74,7 +126,19 @@ public class AuthController {
     }
 
     @PostMapping("/unfollow/{userId}")
-    public Mono<UserDto> unfollowUser(@PathVariable String userId) {
+    @Operation(summary = "Unfollow user", description = "Stop following a user")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "User unfollowed successfully",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserDto.class))),
+        @ApiResponse(responseCode = "404", description = "User not found",
+                content = @Content),
+        @ApiResponse(responseCode = "401", description = "Unauthorized",
+                content = @Content)
+    })
+    public Mono<UserDto> unfollowUser(
+            @Parameter(description = "ID of the user to unfollow", required = true)
+            @PathVariable String userId) {
         return currentUserService.getCurrentUser()
                                  .flatMap(currentUser -> userService.unfollowUser(
                                                                             currentUser.getId(),
@@ -83,7 +147,19 @@ public class AuthController {
     }
 
     @PutMapping("/profile")
-    public Mono<UserDto> updateProfile(@RequestBody Map<String, String> profileData) {
+    @Operation(summary = "Update user profile", description = "Update the authenticated user's profile information")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Profile updated successfully",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserDto.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid profile data",
+                content = @Content),
+        @ApiResponse(responseCode = "401", description = "Unauthorized",
+                content = @Content)
+    })
+    public Mono<UserDto> updateProfile(
+            @Parameter(description = "Profile data to update", required = true)
+            @RequestBody Map<String, String> profileData) {
         return currentUserService.getCurrentUser()
                                  .flatMap(currentUser -> userService.updateProfile(
                                                                             currentUser.getId(),
@@ -95,7 +171,18 @@ public class AuthController {
     }
 
     @DeleteMapping("/users/{firebaseUid}")
-    public Mono<Void> deleteUser(@PathVariable String firebaseUid) {
+    @Operation(summary = "Delete user account", description = "Permanently delete a user account and all associated data")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "User deleted successfully"),
+        @ApiResponse(responseCode = "404", description = "User not found",
+                content = @Content),
+        @ApiResponse(responseCode = "401", description = "Unauthorized",
+                content = @Content)
+    })
+    public Mono<Void> deleteUser(
+            @Parameter(description = "Firebase UID of the user to delete", required = true)
+            @PathVariable String firebaseUid) {
         log.info("🗑️ DELETE USER ENDPOINT HIT! firebaseUid={}", firebaseUid);
         
         return userDeleteService.deleteAllUserData(firebaseUid)
@@ -103,7 +190,18 @@ public class AuthController {
     }
 
     @PostMapping("/merge-accounts")
-    public Mono<UserDto> mergeAccounts(@RequestBody MergeAccountsRequest request) {
+    @Operation(summary = "Merge user accounts", description = "Merge an anonymous account with a registered account")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Accounts merged successfully",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserDto.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid merge request",
+                content = @Content),
+        @ApiResponse(responseCode = "401", description = "Authentication failed",
+                content = @Content)
+    })
+    public Mono<UserDto> mergeAccounts(
+            @Parameter(description = "Account merge request", required = true)
+            @RequestBody MergeAccountsRequest request) {
         log.info("🔄 MERGE ACCOUNTS ENDPOINT HIT!");
         
         return userService.mergeAccounts(request.anonymousUserToken(), request.newUserToken())

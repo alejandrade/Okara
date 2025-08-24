@@ -1,11 +1,17 @@
 package io.shrouded.okara.security;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.core.userdetails.MapReactiveUserDetailsService;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
@@ -19,6 +25,12 @@ import java.util.List;
 public class SecurityConfig {
 
     private final FirebaseReactiveAuthenticationWebFilter firebaseReactiveAuthenticationWebFilter;
+    
+    @Value("${docs.security.username:admin}")
+    private String docsUsername;
+    
+    @Value("${docs.security.password:docs123}")
+    private String docsPassword;
 
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
@@ -29,6 +41,10 @@ public class SecurityConfig {
                         // Public endpoints
                         .pathMatchers("/actuator/**").permitAll()
                         .pathMatchers("/api/info").permitAll()
+                        // API Documentation endpoints - basic auth required
+                        .pathMatchers("/v3/api-docs/**").hasRole("DOCS")
+                        .pathMatchers("/swagger-ui/**").hasRole("DOCS")
+                        .pathMatchers("/swagger-ui.html").hasRole("DOCS")
                         .pathMatchers("/api/feed/{postId}").authenticated()
                         .pathMatchers("/api/feed/{postId}/comments").authenticated()
                         .pathMatchers("/api/feed/user/{userId}").authenticated()
@@ -51,8 +67,24 @@ public class SecurityConfig {
                         // All other requests require authentication
                         .anyExchange().authenticated()
                 )
+                .httpBasic(httpBasic -> {})
                 .addFilterBefore(firebaseReactiveAuthenticationWebFilter, SecurityWebFiltersOrder.AUTHENTICATION)
                 .build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public MapReactiveUserDetailsService userDetailsService() {
+        UserDetails docsUser = User.builder()
+                .username(docsUsername)
+                .password(passwordEncoder().encode(docsPassword))
+                .roles("DOCS")
+                .build();
+        return new MapReactiveUserDetailsService(docsUser);
     }
 
     @Bean

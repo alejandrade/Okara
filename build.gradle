@@ -52,6 +52,9 @@ dependencies {
     implementation 'org.mapstruct:mapstruct:1.5.5.Final'
     annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.5.Final'
     
+    // Swagger/OpenAPI
+    implementation 'org.springdoc:springdoc-openapi-starter-webflux-ui:2.2.0'
+    
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }

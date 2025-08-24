@@ -17,11 +17,22 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 
 @RestController
 @RequestMapping("/api/views")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "View Tracking", description = "User view tracking and analytics endpoints")
+@SecurityRequirement(name = "bearerAuth")
 public class ViewTrackingController {
 
     private final ViewTrackingService viewTrackingService;
@@ -31,7 +42,18 @@ public class ViewTrackingController {
      * Record that a user viewed a feed item
      */
     @PostMapping("/record")
-    public Mono<ViewResponse> recordView(@RequestBody final ViewRequest request) {
+    @Operation(summary = "Record view", description = "Records that a user viewed a feed item for analytics purposes")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "View recorded successfully",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = ViewResponse.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid view data",
+                content = @Content),
+        @ApiResponse(responseCode = "401", description = "Unauthorized",
+                content = @Content)
+    })
+    public Mono<ViewResponse> recordView(
+            @Parameter(description = "View tracking request", required = true)
+            @RequestBody final ViewRequest request) {
         return currentUserService.getCurrentUserId()
                                  .flatMap(userId -> viewTrackingService.recordFeedItemView(
                                          userId,
@@ -51,7 +73,18 @@ public class ViewTrackingController {
      * Get view count for a specific post
      */
     @GetMapping("/post/{postId}/count")
-    public Mono<ViewCountResponse> getPostViewCount(@PathVariable String postId) {
+    @Operation(summary = "Get post view count", description = "Retrieves the total number of views for a specific post")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "View count retrieved successfully",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = ViewCountResponse.class))),
+        @ApiResponse(responseCode = "404", description = "Post not found",
+                content = @Content),
+        @ApiResponse(responseCode = "401", description = "Unauthorized",
+                content = @Content)
+    })
+    public Mono<ViewCountResponse> getPostViewCount(
+            @Parameter(description = "ID of the post", required = true)
+            @PathVariable String postId) {
         return viewTrackingService.getPostViewCount(postId)
                                   .map(ViewCountResponse::new)
                                   .onErrorReturn(new ViewCountResponse(0L))
@@ -62,6 +95,13 @@ public class ViewTrackingController {
      * Get current user's total view count
      */
     @GetMapping("/user/count")
+    @Operation(summary = "Get user view count", description = "Retrieves the total number of views received by the authenticated user's posts")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "User view count retrieved successfully",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = ViewCountResponse.class))),
+        @ApiResponse(responseCode = "401", description = "Unauthorized",
+                content = @Content)
+    })
     public Mono<ViewCountResponse> getCurrentUserViewCount() {
         return currentUserService.getCurrentUserId()
                                  .flatMap(viewTrackingService::getUserViewCount)
@@ -74,7 +114,18 @@ public class ViewTrackingController {
      * Check if current user has viewed a specific post
      */
     @GetMapping("/post/{postId}/viewed")
-    public Mono<ViewedResponse> hasViewedPost(@PathVariable String postId) {
+    @Operation(summary = "Check if post was viewed", description = "Checks if the authenticated user has viewed a specific post")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "View status retrieved successfully",
+                content = @Content(mediaType = "application/json", schema = @Schema(implementation = ViewedResponse.class))),
+        @ApiResponse(responseCode = "404", description = "Post not found",
+                content = @Content),
+        @ApiResponse(responseCode = "401", description = "Unauthorized",
+                content = @Content)
+    })
+    public Mono<ViewedResponse> hasViewedPost(
+            @Parameter(description = "ID of the post", required = true)
+            @PathVariable String postId) {
         return currentUserService.getCurrentUserId()
                                  .flatMap(userId -> viewTrackingService.hasUserViewedPost(userId, postId))
                                  .map(ViewedResponse::new)
